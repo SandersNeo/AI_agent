@@ -2,6 +2,10 @@
 
 Поддерживаются несколько способов тестирования: через Python (COM), встроенный модуль ИИА_Тесты, Vanessa Automation и статический анализ BSL.
 
+Отдельно поддерживается внешний benchmark через Tau-Bench для сравнения с публичным tool-use benchmark. Он не заменяет локальные сценарии 1С.
+
+Как сочетать локальный benchmark и Tau-Bench на уровне KPI и release-решений: [docs/EVAL_STRATEGY.md](../docs/EVAL_STRATEGY.md)
+
 ## Запуск через run_tests.py
 
 Скрипт `automation/run_tests.py` запускает тесты через COM без открытия 1С:
@@ -50,6 +54,24 @@ python run_dialog.py --text "Создай документ" --type Agent --log-f
 ```
 
 Подробнее: [automation/com_1c/README.md](../automation/com_1c/README.md)
+
+## Внешний benchmark: Tau-Bench
+
+Скрипт `automation/run_tau_bench.py` запускает официальный `tau2` CLI в отдельном checkout Tau-Bench и складывает артефакты в `automation/logs/tau_bench/`.
+
+```bash
+cd automation
+python run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
+python run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
+python run_tau_bench.py --compare-local-report .\logs\examples_20260408_090000\report.json
+```
+
+Нужен локальный checkout Tau-Bench и `uv`. Путь задаётся через `TAU_BENCH_REPO` или `--tau-repo`.
+
+Подробнее: [docs/TAU_BENCH.md](../docs/TAU_BENCH.md)
+Bridge для запуска именно 1С-агента внутри внешнего benchmark-контура: [docs/TAU_AGENT_BRIDGE.md](../docs/TAU_AGENT_BRIDGE.md)
+Практический запуск real-run с custom agent: [docs/TAU_REAL_RUN.md](../docs/TAU_REAL_RUN.md)
+Для дешёвого и бесплатного Tau smoke/regression контура используйте `--cost-mode cheap|free`.
 
 ## Vanessa Automation
 

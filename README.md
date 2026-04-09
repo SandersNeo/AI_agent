@@ -87,6 +87,10 @@ graph TD
 | 🛡 [**Безопасность**](docs/SECURITY.md) | Как настроить ограничения и защитить базу. |
 | 🔎 [**RAG Поиск**](docs/RAG.md) | Подробности работы семантического поиска по метаданным. |
 | 🧪 [**Тестирование**](docs/TESTING.md) | Инструменты для проверки качества работы агента. |
+| 📊 [**Стратегия оценки**](docs/EVAL_STRATEGY.md) | Как сочетать локальный benchmark и Tau-Bench без самообмана в KPI. |
+| 📏 [**Tau-Bench**](docs/TAU_BENCH.md) | Внешний benchmark для сравнения с публичным tool-use baseline. |
+| 🔌 [**Tau Bridge**](docs/TAU_AGENT_BRIDGE.md) | Scaffold для запуска 1С-агента внутри внешнего benchmark-контура. |
+| ▶ [**Tau Real Run**](docs/TAU_REAL_RUN.md) | Как запускать Tau-Bench с 1С-backed custom agent. |
 
 **Удобное скачивание, техподдержка, подписка на обновления:** [gitsell.ru/msrv-tech/AI_agent](https://gitsell.ru/msrv-tech/AI_agent)
 
