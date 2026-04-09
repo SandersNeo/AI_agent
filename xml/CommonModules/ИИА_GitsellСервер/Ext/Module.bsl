@@ -346,9 +346,17 @@
 	// OpenAI
 	Модели.Добавить(Новый Структура("id, name", "gpt-4", "openai/gpt-4"));
 	Модели.Добавить(Новый Структура("id, name", "gpt-4-turbo", "openai/gpt-4-turbo"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-4.1", "openai/gpt-4.1"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-4.1-mini", "openai/gpt-4.1-mini"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-4.1-nano", "openai/gpt-4.1-nano"));
 	Модели.Добавить(Новый Структура("id, name", "gpt-4o", "openai/gpt-4o"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-4o-mini", "openai/gpt-4o-mini"));
 	Модели.Добавить(Новый Структура("id, name", "gpt-3.5-turbo", "openai/gpt-3.5-turbo"));
 	Модели.Добавить(Новый Структура("id, name", "gpt-3.5-turbo-16k", "openai/gpt-3.5-turbo-16k"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-5.4", "openai/gpt-5.4"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-5.4-mini", "openai/gpt-5.4-mini"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-5.4-nano", "openai/gpt-5.4-nano"));
+	Модели.Добавить(Новый Структура("id, name", "gpt-5.4-thinking", "openai/gpt-5.4-thinking"));
 	Модели.Добавить(Новый Структура("id, name", "gpt-image-1", "openai/gpt-image-1"));
 	Модели.Добавить(Новый Структура("id, name", "gpt-image-1-mini", "openai/gpt-image-1-mini"));
 	

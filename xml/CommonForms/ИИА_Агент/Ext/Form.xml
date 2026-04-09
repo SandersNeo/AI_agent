@@ -143,6 +143,25 @@
 							<ContextMenu name="ТекущийТекстКонтекстноеМеню" id="42"/>
 							<ExtendedTooltip name="ТекущийТекстРасширеннаяПодсказка" id="43"/>
 						</InputField>
+						<UsualGroup name="ГруппаВложения" id="205">
+							<Title>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Группа вложения</v8:content>
+								</v8:item>
+							</Title>
+							<Group>Vertical</Group>
+							<Representation>None</Representation>
+							<ShowTitle>false</ShowTitle>
+							<ExtendedTooltip name="ГруппаВложенияРасширеннаяПодсказка" id="206"/>
+							<ChildItems>
+								<Button name="ПрикрепитьФайл" id="210">
+									<Type>UsualButton</Type>
+									<CommandName>Form.Command.ПрикрепитьФайл</CommandName>
+									<ExtendedTooltip name="ПрикрепитьФайлРасширеннаяПодсказка" id="211"/>
+								</Button>
+							</ChildItems>
+						</UsualGroup>
 						<UsualGroup name="ГруппаОтправить" id="71">
 							<Title>
 								<v8:item>
@@ -624,6 +643,15 @@
 				</v8:item>
 			</Title>
 			<Action>Настройка</Action>
+		</Command>
+		<Command name="ПрикрепитьФайл" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Прикрепить файл</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ПрикрепитьФайл</Action>
 		</Command>
 	</Commands>
 </Form>
