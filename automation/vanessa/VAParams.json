@@ -1,6 +1,6 @@
 {
   "Lang": "ru",
-  "featurepath": "D:\\EDTApps\\AI_agent\\automation\\vanessa\\TestAIAgent.feature",
+  "featurepath": "D:\\EDTApps\\AI_agent\\automation\\vanessa\\AttachFiles.feature",
   "ВыполнитьСценарии": true,
   "useaddin": true,
   "TestClient": {
@@ -9,7 +9,7 @@
     "datatestclients": [
       {
         "Name": "LocalFileBase",
-        "PathToInfobase": "File=\"D:\\EDT_base\\КонфигурацияТест\";",
+        "PathToInfobase": "File=\"D:\\bd\\УНФ3013238\";Usr=\"Администратор\";Pwd=",
         "PortTestClient": 48010,
         "AddItionalParameters": "",
         "ClientType": "Thin",

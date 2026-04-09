@@ -6,9 +6,12 @@ param(
     [string]$Password = '',
     [string]$LogDir = "$PSScriptRoot\logs",
     [string]$VanessaRunnerEpf = "$PSScriptRoot\vanessa-automation-single.epf",
+    [string]$VAExtensionCfe = "$PSScriptRoot\VAExtension.cfe",
     [string]$FeatureFile = "$PSScriptRoot\AddCatalog2TestEntry.feature",
     [string]$VAParamsPath = "$PSScriptRoot\VAParams.json",
-    [switch]$SkipDbUpdate
+    [switch]$SkipDbUpdate,
+    [switch]$InstallVAExtension,
+    [switch]$InstallVanessaExt
 )
 
 <# 
@@ -70,6 +73,220 @@ function Invoke-Platform {
     if ($process.ExitCode -ne 0) {
         throw "Команда 1cv8 для операции '$OperationName' завершилась с кодом $($process.ExitCode)"
     }
+}
+
+function Invoke-VanessaFeatureRun {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory)]
+        [string]$OperationName,
+        [Parameter(Mandatory)]
+        [string]$LogPath,
+        [Parameter(Mandatory)]
+        [string]$ConnectionStringValue,
+        [Parameter(Mandatory)]
+        [string]$RunnerPath
+    )
+
+    Write-Host "==> $OperationName"
+    Write-Host ("    1cv8.exe {0}" -f ($Arguments -join ' '))
+
+    if (Test-Path -LiteralPath $LogPath) {
+        Remove-Item -LiteralPath $LogPath -Force -ErrorAction SilentlyContinue
+    }
+
+    $process = Start-Process -FilePath $PlatformExe -ArgumentList $Arguments -PassThru
+
+    $deadline = (Get-Date).AddMinutes(15)
+    $finishedMarker = 'Выполнение сценариев закончено.'
+
+    try {
+        while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+
+            if ($process.HasExited) {
+                break
+            }
+
+            if (Test-Path -LiteralPath $LogPath) {
+                try {
+                    $content = Get-Content -LiteralPath $LogPath -Raw -ErrorAction Stop
+                    if ($content -like "*$finishedMarker*") {
+                        Stop-VanessaTestProcesses -ConnectionStringValue $ConnectionStringValue -RunnerPath $RunnerPath
+                        $process.WaitForExit(15000) | Out-Null
+                        break
+                    }
+                } catch {
+                }
+            }
+        }
+
+        if (-not $process.HasExited) {
+            Stop-VanessaTestProcesses -ConnectionStringValue $ConnectionStringValue -RunnerPath $RunnerPath
+            $process.WaitForExit(15000) | Out-Null
+        }
+
+        if (-not $process.HasExited) {
+            throw "Превышено время ожидания завершения Vanessa Automation."
+        }
+
+        if ($process.ExitCode -ne 0) {
+            throw "Команда 1cv8 для операции '$OperationName' завершилась с кодом $($process.ExitCode)"
+        }
+    } finally {
+        Stop-VanessaTestProcesses -ConnectionStringValue $ConnectionStringValue -RunnerPath $RunnerPath
+    }
+}
+
+function Stop-VanessaTestProcesses {
+    param(
+        [string]$ConnectionStringValue,
+        [string]$RunnerPath
+    )
+
+    try {
+        $targets = Get-CimInstance Win32_Process | Where-Object {
+            ($_.Name -like '1cv8*.exe') -and
+            $_.CommandLine -and
+            (
+                ($_.CommandLine -like '* /TESTCLIENT *') -or
+                ($_.CommandLine -like '* /TESTMANAGER *') -or
+                ($RunnerPath -and $_.CommandLine -like "*$RunnerPath*")
+            )
+        }
+
+        foreach ($process in $targets) {
+            try {
+                & taskkill.exe /PID $process.ProcessId /T /F | Out-Null
+            } catch {
+            }
+        }
+
+        Start-Sleep -Seconds 2
+
+        $leftovers = Get-CimInstance Win32_Process | Where-Object {
+            ($_.Name -like '1cv8*.exe') -and
+            $_.CommandLine -and
+            (
+                ($_.CommandLine -like '* /TESTCLIENT *') -or
+                ($_.CommandLine -like '* /TESTMANAGER *') -or
+                ($RunnerPath -and $_.CommandLine -like "*$RunnerPath*")
+            )
+        }
+
+        foreach ($process in $leftovers) {
+            try {
+                Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+            } catch {
+            }
+        }
+    } catch {
+        Write-Warning ("Не удалось завершить тестовые процессы 1С: {0}" -f $_.Exception.Message)
+    }
+}
+
+function Install-VanessaExtQuietly {
+    param(
+        [string]$RunnerPath,
+        [string]$ConnectionStringValue,
+        [string]$User,
+        [string]$Pass,
+        [string]$LogPath
+    )
+
+    $installArgs = @(
+        'ENTERPRISE',
+        '/DisableStartupDialogs',
+        '/DisableStartupMessages',
+        '/TESTMANAGER',
+        '/IBConnectionString', $ConnectionStringValue
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($User)) {
+        $installArgs += '/N'
+        $installArgs += $User
+    }
+    if (-not [string]::IsNullOrEmpty($Pass)) {
+        $installArgs += '/P'
+        $installArgs += $Pass
+    }
+
+    $installArgs += '/Execute'
+    $installArgs += $RunnerPath
+    $installArgs += '/Out'
+    $installArgs += $LogPath
+    $installArgs += '/C'
+    $installArgs += 'QuietInstallVanessaExtAndClose=1'
+
+    Invoke-Platform -Arguments $installArgs -OperationName 'Тихая установка VanessaExt'
+}
+
+function Ensure-VAExtensionCfe {
+    param(
+        [string]$TargetPath
+    )
+
+    if (Test-Path -LiteralPath $TargetPath -PathType Leaf) {
+        return
+    }
+
+    $directory = Split-Path -Parent $TargetPath
+    if ($directory -and -not (Test-Path -LiteralPath $directory)) {
+        New-Item -ItemType Directory -Path $directory | Out-Null
+    }
+
+    Write-Host "==> Скачивание VAExtension.cfe"
+    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/Pr-Mex/vanessa-automation/releases/latest' -Headers @{ 'User-Agent' = 'Codex' }
+    $asset = $release.assets | Where-Object { $_.name -like 'VAExtension*.cfe' } | Select-Object -First 1
+    if ($null -eq $asset) {
+        throw 'Не найден asset VAExtension*.cfe в latest release vanessa-automation.'
+    }
+
+    Invoke-WebRequest -Uri $asset.browser_download_url -Headers @{ 'User-Agent' = 'Codex' } -OutFile $TargetPath
+}
+
+function Install-VAExtensionInDatabase {
+    param(
+        [string]$CfePath,
+        [string]$ConnectionStringValue,
+        [string]$User,
+        [string]$Pass,
+        [string]$LogPath
+    )
+
+    $designerBaseArgs = @(
+        'DESIGNER',
+        '/DisableStartupDialogs',
+        '/DisableStartupMessages',
+        '/IBConnectionString', $ConnectionStringValue
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($User)) {
+        $designerBaseArgs += '/N'
+        $designerBaseArgs += $User
+    }
+    if (-not [string]::IsNullOrEmpty($Pass)) {
+        $designerBaseArgs += '/P'
+        $designerBaseArgs += $Pass
+    }
+
+    $loadArgs = @($designerBaseArgs)
+    $loadArgs += '/Out'
+    $loadArgs += $LogPath
+    $loadArgs += '/LoadCfg'
+    $loadArgs += $CfePath
+    $loadArgs += '-Extension'
+    $loadArgs += 'VAExtension'
+    Invoke-Platform -Arguments $loadArgs -OperationName 'Загрузка расширения VAExtension в конфигурацию'
+
+    $updateArgs = @($designerBaseArgs)
+    $updateArgs += '/Out'
+    $updateArgs += $LogPath
+    $updateArgs += '/UpdateDBCfg'
+    $updateArgs += '-Extension'
+    $updateArgs += 'VAExtension'
+    Invoke-Platform -Arguments $updateArgs -OperationName 'Обновление БД для расширения VAExtension'
 }
 
 function Initialize-VAParamsFile {
@@ -134,6 +351,7 @@ Test-RequiredFile -Path $FeatureFile -Description 'Vanessa Automation feature'
 
 $vanessaRunnerEpfFullPath = (Resolve-Path -LiteralPath $VanessaRunnerEpf).Path
 $featureFullPath = (Resolve-Path -LiteralPath $FeatureFile).Path
+$vaExtensionCfeFullPath = [System.IO.Path]::GetFullPath($VAExtensionCfe)
 
 if (-not (Test-Path -LiteralPath $VAParamsPath)) {
     Write-Host "Создаю файл VAParams.json по умолчанию: $VAParamsPath"
@@ -192,6 +410,8 @@ if (-not (Test-Path -LiteralPath $LogDir)) {
 
 $updateLog = Join-Path -Path $LogDir -ChildPath 'update-db.log'
 $vanessaLog = Join-Path -Path $LogDir -ChildPath 'vanessa.log'
+$installExtLog = Join-Path -Path $LogDir -ChildPath 'install-vanessa-ext.log'
+$installVAExtensionLog = Join-Path -Path $LogDir -ChildPath 'install-vaextension.log'
 
 if (-not $SkipDbUpdate) {
     $designerArgs = @(
@@ -219,7 +439,7 @@ if (-not $SkipDbUpdate) {
     Write-Host 'Пропускаю обновление БД (флаг -SkipDbUpdate).'
 }
 
-$vanessaCommand = "StartFeaturePlayer;FeatureFile=$featureFullPath;CloseTestClientBefore=1;StopOnError=1;LogDirectory=$LogDir;VAParams=$vaParamsFullPath;vanessarun=1;"
+$vanessaCommand = "StartFeaturePlayer;FeatureFile=$featureFullPath;CloseTestClientBefore=1;StopOnError=1;ShowMainForm=0;LogDirectory=$LogDir;VAParams=$vaParamsFullPath;vanessarun=1;"
 
 $vanessaArgs = @(
     'ENTERPRISE',
@@ -245,7 +465,19 @@ $vanessaArgs += $vanessaLog
 $vanessaArgs += '/C'
 $vanessaArgs += $vanessaCommand
 
-Invoke-Platform -Arguments $vanessaArgs -OperationName 'Запуск сценария Vanessa Automation'
+try {
+    if ($InstallVAExtension) {
+        Ensure-VAExtensionCfe -TargetPath $vaExtensionCfeFullPath
+        Install-VAExtensionInDatabase -CfePath $vaExtensionCfeFullPath -ConnectionStringValue $ConnectionString -User $UserName -Pass $Password -LogPath $installVAExtensionLog
+    }
 
-Write-Host 'Выполнение завершено: обновление БД и сценарий Vanessa успешно отработали.'
+    if ($InstallVanessaExt) {
+        Install-VanessaExtQuietly -RunnerPath $vanessaRunnerEpfFullPath -ConnectionStringValue $ConnectionString -User $UserName -Pass $Password -LogPath $installExtLog
+    }
 
+    Invoke-VanessaFeatureRun -Arguments $vanessaArgs -OperationName 'Запуск сценария Vanessa Automation' -LogPath $vanessaLog -ConnectionStringValue $ConnectionString -RunnerPath $vanessaRunnerEpfFullPath
+    Write-Host 'Выполнение завершено: обновление БД и сценарий Vanessa успешно отработали.'
+}
+finally {
+    Stop-VanessaTestProcesses -ConnectionStringValue $ConnectionString -RunnerPath $vanessaRunnerEpfFullPath
+}
