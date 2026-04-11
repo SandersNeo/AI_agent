@@ -84,6 +84,7 @@ graph TD
 | 📋 [**Планирование**](docs/PLANNING.md) | Глубокое погружение в механизм составления планов. |
 | 💻 [**DSL Команды**](docs/DSL.md) | Описание языка, на котором агент общается с 1С. |
 | 🏗 [**Архитектура**](docs/AGENT_ARCHITECTURE.md) | Техническое устройство модулей и потоки данных. |
+| 🧭 [**LangGraph Runtime**](docs/LANGGRAPH_RUNTIME_FINAL.md) | Итоговая архитектура LangGraph-style runtime: графы, subgraphs, replay safety, policy layer, metrics и investigation API. |
 | 🛡 [**Безопасность**](docs/SECURITY.md) | Как настроить ограничения и защитить базу. |
 | 🔎 [**RAG Поиск**](docs/RAG.md) | Подробности работы семантического поиска по метаданным. |
 | 🧪 [**Тестирование**](docs/TESTING.md) | Инструменты для проверки качества работы агента. |

@@ -193,6 +193,36 @@
 									<ContextMenu name="ТекущийТипСообщенияКонтекстноеМеню" id="45"/>
 									<ExtendedTooltip name="ТекущийТипСообщенияРасширеннаяПодсказка" id="46"/>
 								</InputField>
+								<UsualGroup name="ГруппаПодтверждения" id="300">
+									<Title>
+										<v8:item>
+											<v8:lang>ru</v8:lang>
+											<v8:content>Группа подтверждения</v8:content>
+										</v8:item>
+									</Title>
+									<Group>Vertical</Group>
+									<Representation>None</Representation>
+									<ShowTitle>false</ShowTitle>
+									<Visible>false</Visible>
+									<ExtendedTooltip name="ГруппаПодтвержденияРасширеннаяПодсказка" id="301"/>
+									<ChildItems>
+										<Button name="ПодтвердитьДействие" id="302">
+											<Type>UsualButton</Type>
+											<CommandName>Form.Command.ПодтвердитьДействие</CommandName>
+											<ExtendedTooltip name="ПодтвердитьДействиеРасширеннаяПодсказка" id="303"/>
+										</Button>
+										<Button name="ОтклонитьДействие" id="304">
+											<Type>UsualButton</Type>
+											<CommandName>Form.Command.ОтклонитьДействие</CommandName>
+											<ExtendedTooltip name="ОтклонитьДействиеРасширеннаяПодсказка" id="305"/>
+										</Button>
+										<Button name="БезПодтверждения" id="306">
+											<Type>UsualButton</Type>
+											<CommandName>Form.Command.БезПодтверждения</CommandName>
+											<ExtendedTooltip name="БезПодтвержденияРасширеннаяПодсказка" id="307"/>
+										</Button>
+									</ChildItems>
+								</UsualGroup>
 							</ChildItems>
 						</UsualGroup>
 					</ChildItems>
@@ -421,6 +451,26 @@
 								</InputField>
 							</ChildItems>
 						</Table>
+						<LabelDecoration name="ЗаголовокDecisionTimeline" id="320">
+							<Title formatted="false">
+								<v8:item>
+									<v8:lang/>
+									<v8:content>Decision Timeline</v8:content>
+								</v8:item>
+							</Title>
+							<ContextMenu name="ЗаголовокDecisionTimelineКонтекстноеМеню" id="321"/>
+							<ExtendedTooltip name="ЗаголовокDecisionTimelineРасширеннаяПодсказка" id="322"/>
+						</LabelDecoration>
+						<InputField name="DecisionTimeline" id="323">
+							<DataPath>DecisionTimeline</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<Height>10</Height>
+							<AutoMaxHeight>false</AutoMaxHeight>
+							<MultiLine>true</MultiLine>
+							<ReadOnly>true</ReadOnly>
+							<ContextMenu name="DecisionTimelineКонтекстноеМеню" id="324"/>
+							<ExtendedTooltip name="DecisionTimelineРасширеннаяПодсказка" id="325"/>
+						</InputField>
 					</ChildItems>
 				</UsualGroup>
 			</ChildItems>
@@ -614,6 +664,21 @@
 				</v8:NumberQualifiers>
 			</Type>
 		</Attribute>
+		<Attribute name="DecisionTimeline" id="326">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Decision Timeline</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
 	</Attributes>
 	<Commands>
 		<Command name="Отправить" id="1">
@@ -652,6 +717,33 @@
 				</v8:item>
 			</Title>
 			<Action>ПрикрепитьФайл</Action>
+		</Command>
+		<Command name="ПодтвердитьДействие" id="8">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Подтвердить</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ПодтвердитьДействие</Action>
+		</Command>
+		<Command name="ОтклонитьДействие" id="9">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Отклонить</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ОтклонитьДействие</Action>
+		</Command>
+		<Command name="БезПодтверждения" id="10">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Выполнять без подтверждения</v8:content>
+				</v8:item>
+			</Title>
+			<Action>БезПодтверждения</Action>
 		</Command>
 	</Commands>
 </Form>
