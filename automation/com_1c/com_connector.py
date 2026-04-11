@@ -8,6 +8,7 @@
 - выполнение запросов и безопасная работа с COM-объектами.
 """
 
+import os
 import re
 import sys
 from typing import Iterable, Optional, Sequence, Tuple
@@ -55,6 +56,42 @@ def set_verbose(value: bool) -> None:
 def _log(msg: str) -> None:
     if _verbose:
         print(msg)
+
+
+def disable_proxy_env_for_1c() -> None:
+    """
+    Убирает proxy-переменные из окружения текущего процесса перед COM/1C вызовами.
+
+    Это нужно для машин, где shell-сессия запускается с временным SOCKS/HTTP proxy,
+    но 1С и провайдер внутри 1С должны ходить напрямую. Поведение можно отключить
+    через AI_AGENT_KEEP_PROXY_ENV=1.
+    """
+    if os.environ.get("AI_AGENT_KEEP_PROXY_ENV") == "1":
+        _log("Proxy env сохранены: AI_AGENT_KEEP_PROXY_ENV=1")
+        return
+
+    proxy_names = (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    )
+    removed = []
+    for name in proxy_names:
+        if os.environ.get(name):
+            removed.append(f"{name}={os.environ.get(name)}")
+            os.environ.pop(name, None)
+
+    # NO_PROXY без самих proxy-переменных не нужен и только путает диагностику.
+    for name in ("NO_PROXY", "no_proxy"):
+        if os.environ.get(name):
+            removed.append(f"{name}={os.environ.get(name)}")
+            os.environ.pop(name, None)
+
+    if removed:
+        _log("Proxy env отключены для 1C automation: " + "; ".join(removed))
 
 
 def call_if_callable(value, *args, **kwargs):
@@ -254,6 +291,7 @@ def connect_to_1c(db_path_or_config: str):
     Returns:
         COM-объект соединения или None при ошибке.
     """
+    disable_proxy_env_for_1c()
     try:
         connector, progid = get_com_connector()
     except Exception as exc:
