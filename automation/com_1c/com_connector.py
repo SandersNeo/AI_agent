@@ -6,6 +6,11 @@
 - выбор и инициализация COM-коннектора (V83.COMConnector / V82.COMConnector);
 - построение строки подключения;
 - выполнение запросов и безопасная работа с COM-объектами.
+
+Важно:
+- для 1С COM automation программная лицензия может зависеть от Windows-user context;
+- sandbox/изолированный пользователь может не видеть ту же 1С-лицензию, что интерактивный пользователь;
+- поэтому боевые COM-прогоны 1С на этой машине нужно выполнять вне sandbox-контекста.
 """
 
 import os
@@ -293,25 +298,37 @@ def connect_to_1c(db_path_or_config: str):
     """
     disable_proxy_env_for_1c()
     try:
-        connector, progid = get_com_connector()
-    except Exception as exc:
-        print(f"Ошибка создания COM-коннектора: {exc}")
-        print("Убедитесь, что установлена платформа 1С:Предприятие.")
-        return None
-    try:
         connection_string, description = resolve_connection_string(db_path_or_config)
         _log(f"Подключение: {description}")
     except Exception as exc:
         print(f"Ошибка подготовки строки подключения: {exc}")
         return None
-    try:
-        com_object = connector.Connect(connection_string)
-        _log("Подключение успешно.")
-        return com_object
-    except Exception as exc:
-        print(f"Ошибка подключения к базе ({progid}): {exc}")
-        print("Возможные причины: база занята (закройте 1С:Предприятие), неверный путь или нет прав.")
-        return None
+    errors = []
+    for progid in DEFAULT_COM_PROGIDS:
+        try:
+            connector = win32com.client.Dispatch(progid)
+        except Exception as exc:
+            errors.append((progid, f"Dispatch: {exc}"))
+            continue
+        connect_method = safe_getattr(connector, "Connect", None)
+        if not callable(connect_method):
+            errors.append((progid, "Connect method not available"))
+            continue
+        try:
+            com_object = connect_method(connection_string)
+            _log(f"Подключение успешно через {progid}.")
+            return com_object
+        except Exception as exc:
+            errors.append((progid, exc))
+            continue
+
+    if errors:
+        for progid, exc in errors:
+            print(f"Ошибка подключения к базе ({progid}): {exc}")
+    else:
+        print("Ошибка: не удалось создать COM-коннектор.")
+    print("Возможные причины: база занята (закройте 1С:Предприятие), неверный путь, нет прав или отсутствует лицензия 1С.")
+    return None
 
 
 def create_query(com_object, query_text: str):

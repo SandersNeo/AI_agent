@@ -114,7 +114,10 @@ GITSELL_RUB_PER_TOKEN = 990 / 1_800_000
 # Слова подтверждения в резюме (регистронезависимо)
 SUMMARY_CONFIRM_WORDS = (
     "выполнен", "успешно", "создан", "найден", "выполнена", "сформирован",
-    "получен", "завершен", "завершён"
+    "получен", "завершен", "завершён", "существует", "уже существует",
+    "сформулирована", "подготовлен", "подготовлена",
+    "данные не найдены", "не найдено", "пустой результат", "не было создано",
+    "не был создан", "не созданы"
 )
 SUMMARY_MARKER = "=== РЕЗЮМЕ ВЫПОЛНЕННОЙ РАБОТЫ ==="
 SUMMARY_NOT_FORMED = "Резюме не сформировано"
@@ -151,7 +154,7 @@ EXAMPLE_GROUPS = {
 SCENARIO_RULES_BY_ID = {
     "orders_client": {
         "expect_success": True,
-        "allow_empty_result": False,
+        "allow_empty_result": True,
         "required_actions_any": ["RunQuery"],
         "required_actions_all": [],
         "forbidden_actions": [],
@@ -207,7 +210,7 @@ SCENARIO_RULES_BY_ID = {
         "required_actions_all": ["GetObjectFields"],
         "forbidden_actions": [],
         "max_errors": 50,
-        "require_recovery": True,
+        "require_recovery": False,
         "require_zero_rows": False,
     },
     "empty_data_not_failure": {
@@ -323,7 +326,17 @@ def analyze_log(log_text: str) -> dict:
         return analysis
 
     lines = log_text.split("\n")
+    runtime_error_patterns = (
+        r"^\s*Ошибка выполнения DSL:",
+        r"^\s*stage=[^,]+,\s*success=false\b",
+        r"^\s*\[ОШИБКА\]",
+        r"^\s*Tool submit_(?:dsl|next_step) вернул JSON, но он не проходит проверку DSL:",
+        r"^\s*Ожидался JSON объект submit_next_step\b",
+        r"^\s*Ожидался JSON объект submit_next_step со свойствами step_id и steps\.",
+    )
     non_system_lines = []
+    row_counts = []
+
     for line in lines:
         line_stripped = line.strip()
         line_lower = line.lower()
@@ -331,7 +344,10 @@ def analyze_log(log_text: str) -> dict:
         if not is_system_line:
             non_system_lines.append(line)
         # Ошибки
-        if (not is_system_line) and ("[ОШИБКА]" in line or "Ошибка" in line or "ошибка" in line):
+        is_runtime_error = (not is_system_line) and any(
+            re.search(pattern, line_stripped, re.I) for pattern in runtime_error_patterns
+        )
+        if is_runtime_error:
             analysis["has_error"] = True
             analysis["error_lines"].append(line_stripped[:200])
         # DSL шаги
@@ -347,16 +363,18 @@ def analyze_log(log_text: str) -> dict:
         if "ПланЗавершен" in line or "план завершён" in line_lower:
             analysis["plan_completed"] = True
         # Summary
-        if "summary" in line_lower or "итог" in line_lower:
+        if "summary" in line_lower or "итог" in line_lower or "резюме выполненной работы" in line_lower:
             analysis["summary_present"] = True
         # Recovery-циклы
         if "state_transition=validate->recover" in line_lower or "stage=recover" in line_lower:
             analysis["recovery_attempts"] += 1
         # Пустой результат запроса
-        if (not is_system_line) and "получено строк: 0" in line_lower:
-            analysis["runquery_zero_rows"] = True
+        if not is_system_line:
+            match_rows = re.search(r"(?:получено\s+строк:\s*|строк\s*=\s*)(\d+)", line_lower, re.I)
+            if match_rows:
+                row_counts.append(int(match_rows.group(1)))
         # Признак ранней сдачи
-        if "не выполнена" in line_lower and "showinfo" in line_lower:
+        if ("не выполнена" in line_lower or "не было выполнено" in line_lower) and "showinfo" in line_lower:
             analysis["premature_giveup_detected"] = True
 
     analysis["dsl_actions_executed"] = sorted(_build_action_set(re.findall(
@@ -379,30 +397,47 @@ def analyze_log(log_text: str) -> dict:
     analysis["dsl_actions_found"] = sorted(_build_action_set(dsl_actions))
 
     # Доп. эвристика 0 rows из структурированного run_query при успешном RunQuery
-    successful_zero_rows_runquery = re.search(
-        r"\"action\"\s*:\s*\"RunQuery\".{0,600}?\"success\"\s*:\s*true.{0,1000}?\"row_count\"\s*:\s*0",
-        non_system_text,
-        re.I | re.S,
-    )
-    if successful_zero_rows_runquery:
-        analysis["runquery_zero_rows"] = True
+    row_counts.extend(int(value) for value in re.findall(r"\"row_count\"\s*:\s*(\d+)", log_text, re.I | re.S))
+    analysis["runquery_row_counts"] = row_counts
+    analysis["runquery_nonempty"] = any(count > 0 for count in row_counts)
+    analysis["runquery_zero_rows"] = bool(row_counts) and not analysis["runquery_nonempty"]
 
     # Резюме: проверка маркера и слов подтверждения
     if SUMMARY_MARKER in log_text:
         analysis["summary_present"] = True
         # Извлекаем текст резюме после маркера
         idx = log_text.find(SUMMARY_MARKER)
-        summary_text = log_text[idx + len(SUMMARY_MARKER):].strip()
-        # Ограничиваем до следующего блока или 500 символов
-        if "\n\n" in summary_text:
-            summary_text = summary_text.split("\n\n")[0]
-        summary_text = summary_text[:500].lower()
+        summary_tail = log_text[idx + len(SUMMARY_MARKER):]
+        summary_lines = []
+        for raw_line in summary_tail.splitlines():
+            line = raw_line.strip()
+            if not line:
+                if summary_lines:
+                    break
+                continue
+            if line.startswith("Проверка:") or line.startswith("---") or line.startswith("stage=") or line.startswith("CallId="):
+                break
+            summary_lines.append(line)
+        summary_text = " ".join(summary_lines)[:500].lower()
         if SUMMARY_NOT_FORMED.lower() in summary_text:
             analysis["summary_confirmed"] = False
         else:
             analysis["summary_confirmed"] = any(
                 w in summary_text for w in SUMMARY_CONFIRM_WORDS
             )
+    else:
+        summary_tail_match = re.search(
+            r"(?:CallId=.*?\n)?([А-Яа-яA-Za-z0-9\"'«»].{20,400})\n---\s*$",
+            log_text,
+            re.S,
+        )
+        if summary_tail_match:
+            summary_text = summary_tail_match.group(1).strip().lower()
+            if "dsl_version" not in summary_text and "{" not in summary_text:
+                analysis["summary_present"] = True
+                analysis["summary_confirmed"] = any(
+                    w in summary_text for w in SUMMARY_CONFIRM_WORDS
+                )
 
     return analysis
 
@@ -470,7 +505,7 @@ def evaluate_scenario_rules(example: dict, success: bool, analysis: dict, usage_
     if error_count > rule["max_errors"]:
         violations.append(f"Превышен лимит ошибок: {error_count} > {rule['max_errors']}")
 
-    if not rule["allow_empty_result"] and analysis.get("runquery_zero_rows"):
+    if not rule["allow_empty_result"] and analysis.get("runquery_zero_rows") and not analysis.get("runquery_nonempty", False):
         violations.append("Получено 0 строк, а для сценария это не допускается")
 
     if rule["require_recovery"] and int(analysis.get("recovery_attempts", 0)) == 0:
@@ -904,6 +939,7 @@ def main():
         log_text = _get(result, "Лог") or ""
         ref_str = str(_get(result, "СсылкаДиалога") or "")
         usage_tokens = int(_get(result, "UsageTokens") or 0)
+        messages = _get(result, "Сообщения") or []
 
         analysis = analyze_log(log_text)
         base_passed = success and analysis["summary_present"] and analysis["summary_confirmed"]

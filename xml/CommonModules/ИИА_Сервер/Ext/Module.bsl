@@ -1376,18 +1376,38 @@
 	СтруктураДанных.Вставить("prompt_version", PromptVersion);
 	СтруктураДанных.Вставить("DSL_РежимВыполнения", DSLРежим);
 	
-	Если НЕ СтруктураДанных.Свойство("DSL_Capabilities") ИЛИ ТипЗнч(СтруктураДанных.DSL_Capabilities) <> Тип("Массив") Тогда
-		Capabilities = Новый Массив;
-		Capabilities.Добавить("metadata.read");
-		Capabilities.Добавить("data.read");
-		Capabilities.Добавить("data.write.reference");
-		Capabilities.Добавить("data.write.document");
-		Capabilities.Добавить("admin.settings");
-		СтруктураДанных.Вставить("DSL_Capabilities", Capabilities);
-	КонецЕсли;
+	СтруктураДанных.Вставить("DSL_Capabilities", ПостроитьDSLCapabilitiesДляДиалога(СсылкаДиалога));
 	
 	ЗаписатьДанныеДиалогаВРегистр(СсылкаДиалога, СтруктураДанных);
 КонецПроцедуры
+
+Функция ПостроитьDSLCapabilitiesДляДиалога(СсылкаДиалога)
+	Capabilities = Новый Массив;
+	Capabilities.Добавить("metadata.read");
+	Capabilities.Добавить("data.read");
+	
+	Если НЕ ЗначениеЗаполнено(СсылкаДиалога) Тогда
+		Возврат Capabilities;
+	КонецЕсли;
+	
+	Попытка
+		Диалог = СсылкаДиалога.ПолучитьОбъект();
+		Если Диалог.ТипДиалога = Перечисления.ИИА_ТипДиалога.Запрос1С Тогда
+			Возврат Capabilities;
+		КонецЕсли;
+		НастройкиПольз = ПолучитьНастройкиПользователя(Диалог.Пользователь);
+		Если НастройкиПольз.Свойство("ДоступнаЗапись") И НЕ НастройкиПольз.ДоступнаЗапись Тогда
+			Возврат Capabilities;
+		КонецЕсли;
+	Исключение
+		Возврат Capabilities;
+	КонецПопытки;
+	
+	Capabilities.Добавить("data.write.reference");
+	Capabilities.Добавить("data.write.document");
+	Capabilities.Добавить("admin.settings");
+	Возврат Capabilities;
+КонецФункции
 
 Функция ПолучитьКонтекстАрхитектуры(СсылкаДиалога) Экспорт
 	Результат = Новый Структура("trace_id,prompt_version,DSL_РежимВыполнения,DSL_Capabilities", "", "", "commit", Новый Массив);
