@@ -72,8 +72,23 @@
 		<Metadata name="CommonModule.ИИА_СправкаЗапросы1С.Module" id="ac1c9697-b5a3-401f-898a-f07b7f2b5157.0" configVersion="48de064737b83d24bfa2308e611982f166e467cc"/>
 		<Metadata name="CommonModule.ИИА_Тесты" id="b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" configVersion="b0b5f4be8c30cd1137e972fa71b2b9908c693531"/>
 		<Metadata name="CommonModule.ИИА_Тесты.Module" id="b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e.0" configVersion="e1bb2d6ebec8e1ba44b72c41a0253b4218f174b4"/>
-		<Metadata name="CommonModule.ИИА_ЯдроМетаданных" id="e7a2b1c3-4d5e-6f7a-8b9c-0d1e2f3a4b5c" configVersion="3de502964c7a7ee962c2ef7b8b2bba6ec3155eb8"/>
-		<Metadata name="CommonModule.ИИА_ЯдроМетаданных.Module" id="e7a2b1c3-4d5e-6f7a-8b9c-0d1e2f3a4b5c.0" configVersion="442299c47f1c8a266666bdc8f43e63827841243e"/>
+		<Metadata name="CommonModule.ИИА_RuntimeКонтракты" id="876e5950-a9db-4955-8a68-d8cc0ac873c5" configVersion="876e5950a9db49558a68d8cc0ac873c501234567"/>
+		<Metadata name="CommonModule.ИИА_RuntimeКонтракты.Module" id="876e5950-a9db-4955-8a68-d8cc0ac873c5.0" configVersion="876e5950a9db49558a68d8cc0ac873c501234567"/>
+		<Metadata name="CommonModule.ИИА_TypedPlan" id="77453935-9037-4ef7-ac8a-dc88510dd25a" configVersion="7745393590374ef7ac8adc88510dd25a01234567"/>
+		<Metadata name="CommonModule.ИИА_TypedPlan.Module" id="77453935-9037-4ef7-ac8a-dc88510dd25a.0" configVersion="7745393590374ef7ac8adc88510dd25a01234567"/>
+		<Metadata name="CommonModule.ИИА_DSLПостроитель" id="abf0495b-10f8-415a-920e-ae164dda7b11" configVersion="abf0495b10f8415a920eae164dda7b1101234567"/>
+		<Metadata name="CommonModule.ИИА_ApprovalPolicy" id="8c7954df-e42e-4f34-81e3-cae6d3e2178f" configVersion="8c7954dfe42e4f3481e3cae6d3e2178f01234567"/>
+		<Metadata name="CommonModule.ИИА_ApprovalPolicy.Module" id="8c7954df-e42e-4f34-81e3-cae6d3e2178f.0" configVersion="8c7954dfe42e4f3481e3cae6d3e2178f01234567"/>
+		<Metadata name="CommonModule.ИИА_ReplayPolicy" id="0e6d61c6-8969-40c7-b1c3-c29c27c5f8c6" configVersion="0e6d61c6896940c7b1c3c29c27c5f8c601234567"/>
+		<Metadata name="CommonModule.ИИА_ReplayPolicy.Module" id="0e6d61c6-8969-40c7-b1c3-c29c27c5f8c6.0" configVersion="0e6d61c6896940c7b1c3c29c27c5f8c601234567"/>
+		<Metadata name="CommonModule.ИИА_RecoveryPolicy" id="d7b6d14b-0d61-4e4b-bf49-782387bd6b8c" configVersion="d7b6d14b0d614e4bbf49782387bd6b8c01234567"/>
+		<Metadata name="CommonModule.ИИА_RecoveryPolicy.Module" id="d7b6d14b-0d61-4e4b-bf49-782387bd6b8c.0" configVersion="d7b6d14b0d614e4bbf49782387bd6b8c01234567"/>
+		<Metadata name="CommonModule.ИИА_ВалидаторРезультата" id="263127b7-3e64-4cb4-8749-4597262e8f3f" configVersion="263127b73e644cb487494597262e8f3f01234567"/>
+		<Metadata name="CommonModule.ИИА_ВалидаторРезультата.Module" id="263127b7-3e64-4cb4-8749-4597262e8f3f.0" configVersion="263127b73e644cb487494597262e8f3f01234567"/>
+		<Metadata name="CommonModule.ИИА_Summary" id="30bb0293-0590-4924-ac78-fbe9fb7b8a57" configVersion="30bb029305904924ac78fbe9fb7b8a5701234567"/>
+		<Metadata name="CommonModule.ИИА_Summary.Module" id="30bb0293-0590-4924-ac78-fbe9fb7b8a57.0" configVersion="30bb029305904924ac78fbe9fb7b8a5701234567"/>
+		<Metadata name="CommonModule.ИИА_RuntimeФакты" id="3f2c1c7e-8b6a-46fd-9f5f-8b3db6f7e2a1" configVersion="3f2c1c7e8b6a46fd9f5f8b3db6f7e2a101234567"/>
+		<Metadata name="CommonModule.ИИА_RuntimeФакты.Module" id="3f2c1c7e-8b6a-46fd-9f5f-8b3db6f7e2a1.0" configVersion="3f2c1c7e8b6a46fd9f5f8b3db6f7e2a101234567"/>
 		<Metadata name="CommonPicture.ИИА_ДлительнаяОперация" id="d88d525a-9a0f-4caf-a7dc-1ad50facf600" configVersion="8a16bf163f82e747f586f88248507c82af06dd4e"/>
 		<Metadata name="CommonPicture.ИИА_ДлительнаяОперация.Picture" id="d88d525a-9a0f-4caf-a7dc-1ad50facf600.0" configVersion="efe3594cfb9fdef1ddaeb701444cdaf7542c4319"/>
 		<Metadata name="CommonPicture.ИИА_Подсистема" id="604eb5c2-5232-4886-ac74-2e61eb482add" configVersion="66e61602e23663030d0388845e27a44cf112a0e0"/>
@@ -158,3 +173,4 @@
 		<Metadata name="Subsystem.ИИА_Агент.CommandInterface" id="a6d9d363-b2e2-40a6-997f-f51ee8298fd3.1" configVersion="9a1202aac485c82d70f8bcc97d456a5e3d9b9cd2"/>
 	</ConfigVersions>
 </ConfigDumpInfo>
+

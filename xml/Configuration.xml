@@ -84,6 +84,15 @@
 			<CommonModule>ИИА_Сервер</CommonModule>
 			<CommonModule>ИИА_СправкаЗапросы1С</CommonModule>
 			<CommonModule>ИИА_Оркестратор</CommonModule>
+			<CommonModule>ИИА_RuntimeКонтракты</CommonModule>
+			<CommonModule>ИИА_TypedPlan</CommonModule>
+			<CommonModule>ИИА_DSLПостроитель</CommonModule>
+			<CommonModule>ИИА_ApprovalPolicy</CommonModule>
+			<CommonModule>ИИА_ReplayPolicy</CommonModule>
+			<CommonModule>ИИА_RecoveryPolicy</CommonModule>
+			<CommonModule>ИИА_ВалидаторРезультата</CommonModule>
+			<CommonModule>ИИА_Summary</CommonModule>
+			<CommonModule>ИИА_RuntimeФакты</CommonModule>
 			<CommonModule>ИИА_RAG_Текст</CommonModule>
 			<CommonModule>ИИА_RAG_Настройки</CommonModule>
 			<CommonModule>ИИА_RAG_Индексатор</CommonModule>
@@ -114,3 +123,4 @@
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>
+
