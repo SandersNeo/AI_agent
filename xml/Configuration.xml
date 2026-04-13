@@ -85,9 +85,21 @@
 			<CommonModule>ИИА_СправкаЗапросы1С</CommonModule>
 			<CommonModule>ИИА_Оркестратор</CommonModule>
 			<CommonModule>ИИА_RuntimeКонтракты</CommonModule>
+			<CommonModule>ИИА_RuntimeЖурналКонтракты</CommonModule>
 			<CommonModule>ИИА_TypedPlan</CommonModule>
+			<CommonModule>ИИА_Вложения</CommonModule>
+			<CommonModule>ИИА_DialogStorage</CommonModule>
+			<CommonModule>ИИА_RuntimeЖурнал</CommonModule>
+			<CommonModule>ИИА_DialogLog</CommonModule>
+			<CommonModule>ИИА_AIInvocation</CommonModule>
 			<CommonModule>ИИА_DSLПостроитель</CommonModule>
-			<CommonModule>ИИА_ApprovalPolicy</CommonModule>
+			<CommonModule>ИИА_DSLQuerySafety</CommonModule>
+ 			<CommonModule>ИИА_DSLКонтракт</CommonModule>
+ 			<CommonModule>ИИА_DSLReplay</CommonModule>
+ 			<CommonModule>ИИА_DSLActionStorage</CommonModule>
+			<CommonModule>ИИА_DSLActionRead</CommonModule>
+			<CommonModule>ИИА_DSLActionWrite</CommonModule>
+ 			<CommonModule>ИИА_ApprovalPolicy</CommonModule>
 			<CommonModule>ИИА_ReplayPolicy</CommonModule>
 			<CommonModule>ИИА_RecoveryPolicy</CommonModule>
 			<CommonModule>ИИА_ВалидаторРезультата</CommonModule>
