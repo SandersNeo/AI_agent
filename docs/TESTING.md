@@ -77,7 +77,7 @@ Bridge для запуска именно 1С-агента внутри внеш
 
 ## Vanessa Automation
 
-Сценарии Gherkin для UI-тестирования формы агента. Файл `TestAIAgent.feature`, запуск через `update-and-run-vanessa.ps1`.
+Сценарии Gherkin для UI-тестирования формы агента. Файл `TestAIAgent.feature`, запуск через `automation/vanessa/update_and_run_vanessa.py`.
 
 Подробнее: [automation/vanessa/TestAIAgent_README.md](../automation/vanessa/TestAIAgent_README.md)
 

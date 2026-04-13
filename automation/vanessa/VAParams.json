@@ -1,6 +1,6 @@
 {
   "Lang": "ru",
-  "featurepath": "D:\\EDTApps\\AI_agent\\automation\\vanessa\\AttachFiles.feature",
+  "featurepath": "D:\\EDTApps\\AI_agent\\automation\\vanessa\\RealAgentRequest.feature",
   "ВыполнитьСценарии": true,
   "useaddin": true,
   "TestClient": {
