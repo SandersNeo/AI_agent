@@ -45,4 +45,5 @@ vendor/tau2-bench/
 
 # BSL Language Server (скачивается отдельно)
 automation/bsl-language-server-*-exec.jar
+automation/bsl/bsl-language-server-*-exec.jar
 

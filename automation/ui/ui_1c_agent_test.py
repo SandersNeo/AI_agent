@@ -4,10 +4,11 @@ Desktop UI тест формы ИИ агента без Vanessa и без COM.
 
 Сценарий:
 1. Открыть клиент 1С.
-2. Открыть раздел "ИИ Агент".
-3. Через пункт "Диалоги" открыть первый существующий диалог.
-4. Передать команду во встроенный UI bridge формы.
-5. Отлавливать модальные ошибки 1С и падать с текстом исключения.
+2. Открыть именно форму "ИИ Агент".
+3. Нажать "Новый диалог".
+4. Ввести пользовательское сообщение в поле ввода.
+5. Нажать кнопку "Отправить".
+6. Дождаться ожидаемого текста в чате или статусе.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ import argparse
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +44,7 @@ def setup_console_encoding() -> None:
 
 
 try:
-    from pywinauto import Application, Desktop, mouse
+    from pywinauto import Application, Desktop, keyboard, mouse
 except Exception:
     print(
         "Ошибка: не импортирован pywinauto. Установите зависимости:\n"
@@ -97,18 +97,15 @@ class OneCAgentUiTest:
         self.process: Optional[subprocess.Popen[str]] = None
         self.app: Optional[Application] = None
         self.main_window = None
-        self.bridge_dir = Path(tempfile.gettempdir()) / "ai_agent_ui_bridge"
-        self.enable_path = self.bridge_dir / "enable.flag"
-        self.request_path = self.bridge_dir / "request.txt"
-        self.response_path = self.bridge_dir / "response.txt"
 
     def run(self) -> int:
         try:
-            self._prepare_bridge_files()
             self._start_client()
             self._open_agent_form()
-            self._send_bridge_command()
-            self._wait_bridge_response()
+            self._start_new_dialog()
+            self._enter_prompt()
+            self._send_prompt()
+            self._wait_expected_response()
             self.logger.info("UI тест завершён успешно.")
             return 0
         except Exception as exc:
@@ -116,26 +113,8 @@ class OneCAgentUiTest:
             self._capture_debug_artifacts()
             return 1
         finally:
-            self._cleanup_bridge_files()
             if not self.config.leave_open:
                 self._close_client()
-
-    def _prepare_bridge_files(self) -> None:
-        self.bridge_dir.mkdir(parents=True, exist_ok=True)
-        for path in (self.request_path, self.response_path):
-            try:
-                path.unlink()
-            except OSError:
-                pass
-        self.enable_path.write_text("enabled\n", encoding="utf-8")
-        self.logger.info(f"Включён UI bridge: {self.bridge_dir}")
-
-    def _cleanup_bridge_files(self) -> None:
-        for path in (self.enable_path, self.request_path, self.response_path):
-            try:
-                path.unlink()
-            except OSError:
-                pass
 
     def _start_client(self) -> None:
         client_env = os.environ.copy()
@@ -177,23 +156,69 @@ class OneCAgentUiTest:
         self._wait_until_client_ready(60)
         nav_item = self._find_descendant_exact("ИИ Агент", "TabItem", 20)
         self._open_agent_section(nav_item)
-        dialogs_item = self._find_descendant_exact("Диалоги", "MenuItem", 20)
-        self._click(dialogs_item)
-        create_button = self._find_descendant_any(["Создать", "Create"], "Button", 20)
-        self._click(create_button)
-        self._wait_window_text_contains("Текущий диалог:", 30)
+        if self._window_contains_any(["Текущий диалог", "Новый диалог", "Отправить"]):
+            self.logger.info("Форма агента уже открыта.")
+            return
+        agent_entry = self._find_descendant_by_titles(
+            ["ИИ Агент"],
+            ["MenuItem", "Hyperlink", "Text", "ListItem"],
+            20,
+        )
+        self._click(agent_entry)
+        self._wait_agent_form_ready(30)
         self.logger.info("Форма агента открыта.")
 
-    def _find_descendant_any(self, titles: list[str], control_type: str, timeout: int):
+    def _start_new_dialog(self) -> None:
+        self.logger.info("Создаём новый диалог в форме агента.")
+        button = self._find_descendant_by_titles(["Новый диалог", "New dialog"], ["Button"], 20)
+        self._click(button)
+        self._wait_window_text_contains("Готов к работе", 20)
+
+    def _enter_prompt(self) -> None:
+        self.logger.info("Вводим пользовательское сообщение.")
+        edit = self._locate_prompt_input()
+        self._click(edit)
+        keyboard.send_keys("^a{BACKSPACE}", pause=0.05)
+        keyboard.send_keys(self._escape_for_send_keys(self.config.prompt), with_spaces=True, pause=0.02)
+        time.sleep(1)
+        full_text = self._window_dump_text(self.main_window)
+        if self.config.prompt.lower() not in full_text.lower():
+            self.logger.info("Текст не отразился в общем dump окна, продолжаем по кнопке отправки.")
+
+    def _send_prompt(self) -> None:
+        self.logger.info("Нажимаем 'Отправить'.")
+        button = self._find_descendant_by_titles(["Отправить", "Send"], ["Button"], 20)
+        self._click(button)
+
+    def _wait_expected_response(self) -> None:
+        self.logger.info("Ждём ожидаемый ответ агента.")
+        deadline = time.time() + self.config.timeout_sec
+        expected = self.config.expected_text.lower()
+        error_markers = ("задача завершена с ошибкой", "ошибка api", "ошибка:")
+        while time.time() < deadline:
+            self._raise_if_error_dialog()
+            text_dump = self._window_dump_text(self.main_window).lower()
+            if expected in text_dump:
+                return
+            for marker in error_markers:
+                if marker in text_dump:
+                    raise RuntimeError(f"В форме агента зафиксирована ошибка:\n{text_dump}")
+            time.sleep(2)
+        raise RuntimeError(f"Не дождались ожидаемого текста ответа: {self.config.expected_text!r}")
+
+    def _find_descendant_by_titles(self, titles: list[str], control_types: list[str], timeout: int):
         deadline = time.time() + timeout
-        wanted = set(titles)
+        wanted = {title.lower() for title in titles}
+        allowed_types = set(control_types)
         while time.time() < deadline:
             self._raise_if_error_dialog()
             for item in self._iter_descendants():
-                if self._safe_text(item) in wanted and self._safe_control_type(item) == control_type:
+                text = self._safe_text(item).lower()
+                ctype = self._safe_control_type(item)
+                if text in wanted and ctype in allowed_types:
                     return item
             time.sleep(1)
-        raise RuntimeError(f"Не найден элемент {titles!r} ({control_type}).")
+        raise RuntimeError(f"Не найден элемент {titles!r} ({', '.join(control_types)}).")
 
     def _open_agent_section(self, nav_item) -> None:
         rect = nav_item.rectangle()
@@ -208,7 +233,13 @@ class OneCAgentUiTest:
             mouse.click(coords=(x, y))
             time.sleep(2)
             try:
-                self._find_descendant_exact("ИИ Агент", "MenuItem", 2)
+                if self._window_contains_any(["Диалоги", "Настройки пользователей", "Текущий диалог"]):
+                    return
+                self._find_descendant_by_titles(
+                    ["ИИ Агент", "Диалоги", "Настройки пользователей"],
+                    ["MenuItem", "Hyperlink", "Text", "ListItem"],
+                    2,
+                )
                 return
             except Exception:
                 continue
@@ -223,32 +254,6 @@ class OneCAgentUiTest:
                 return
             time.sleep(2)
         self.logger.info("Стартовая страница всё ещё занята, продолжаем попытку навигации.")
-
-    def _send_bridge_command(self) -> None:
-        payload = "\n".join(
-            [
-                self.config.prompt,
-                self.config.expected_text,
-                str(self.config.timeout_sec),
-            ]
-        )
-        self.request_path.write_text(payload, encoding="utf-8")
-        self.logger.info(f"Записана команда в UI bridge: {self.request_path}")
-
-    def _wait_bridge_response(self) -> None:
-        deadline = time.time() + self.config.timeout_sec + 30
-        while time.time() < deadline:
-            self._raise_if_error_dialog()
-            if self.response_path.exists():
-                content = self.response_path.read_text(encoding="utf-8", errors="replace")
-                lines = content.splitlines()
-                status = lines[0].strip() if lines else ""
-                details = "\n".join(lines[1:]).strip()
-                if status == "OK":
-                    return
-                raise RuntimeError(f"UI bridge вернул ошибку: {details or content}")
-            time.sleep(1)
-        raise RuntimeError("Не дождались ответа от UI bridge.")
 
     def _find_descendant_exact(self, title: str, control_type: str, timeout: int):
         deadline = time.time() + timeout
@@ -270,6 +275,42 @@ class OneCAgentUiTest:
                 return
             time.sleep(1)
         raise RuntimeError(f"Не найден текст в окне: {text!r}")
+
+    def _wait_agent_form_ready(self, timeout: int) -> None:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self._raise_if_error_dialog()
+            if self._window_contains_any(["Текущий диалог", "Новый диалог", "Отправить"]):
+                return
+            time.sleep(1)
+        raise RuntimeError("Не удалось дождаться загрузки формы агента.")
+
+    def _window_contains_any(self, texts: list[str]) -> bool:
+        full_text = self._window_dump_text(self.main_window).lower()
+        return any(text.lower() in full_text for text in texts)
+
+    def _locate_prompt_input(self):
+        candidates = []
+        for item in self._iter_descendants():
+            ctype = self._safe_control_type(item)
+            if ctype not in ("Edit", "Document", "Pane"):
+                continue
+            text = self._safe_text(item).strip().lower()
+            rect = item.rectangle()
+            if rect.width() < 300 or rect.height() < 40:
+                continue
+            if "текущий диалог" in text or "decision timeline" in text:
+                continue
+            candidates.append(item)
+        if not candidates:
+            raise RuntimeError("Не найдено поле ввода сообщения в форме агента.")
+        candidates.sort(
+            key=lambda item: (
+                item.rectangle().top,
+                -item.rectangle().width(),
+            )
+        )
+        return candidates[0]
 
     def _raise_if_error_dialog(self) -> None:
         for win in Desktop(backend=self.config.backend).windows():
@@ -414,6 +455,23 @@ class OneCAgentUiTest:
                 check=False,
                 timeout=15,
             )
+
+    @staticmethod
+    def _escape_for_send_keys(text: str) -> str:
+        for old, new in (
+            ("{", "{{}"),
+            ("}", "{}}"),
+            ("+", "{+}"),
+            ("^", "{^}"),
+            ("%", "{%}"),
+            ("~", "{~}"),
+            ("(", "{(}"),
+            (")", "{)}"),
+            ("[", "{[}"),
+            ("]", "{]}"),
+        ):
+            text = text.replace(old, new)
+        return text
 
     @staticmethod
     def _clear_proxy_env(env: dict[str, str]) -> None:
