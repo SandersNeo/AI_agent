@@ -9,9 +9,9 @@
     - опционально сравнивает внешний результат с локальным `report.json`.
 
 Примеры:
-    python run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
-    python run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
-    python run_tau_bench.py --compare-local-report .\\logs\\examples_20260408_090000\\report.json
+    python automation/tau/run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
+    python automation/tau/run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
+    python automation/tau/run_tau_bench.py --compare-local-report .\\logs\\examples_20260408_090000\\report.json
 """
 
 import argparse

@@ -19,10 +19,12 @@ import subprocess
 import sys
 import tempfile
 
-# Поддержка запуска из каталога automation
+# Поддержка запуска из каталога automation/build
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-if _script_dir not in sys.path:
-    sys.path.insert(0, _script_dir)
+_automation_dir = os.path.dirname(_script_dir)
+for _path in (_script_dir, _automation_dir):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from com_1c.config import get_platform_83
 from com_1c.com_connector import setup_console_encoding
@@ -131,7 +133,7 @@ def main() -> None:
 
     platform_83 = get_platform_83()
 
-    project_root = os.path.dirname(_script_dir)
+    project_root = os.path.dirname(_automation_dir)
     xml_src = os.path.join(project_root, "xml")
     bin_dir = os.path.join(project_root, "bin")
     output_name = args.output or f"{EXTENSION_NAME}_8.3.cfe"

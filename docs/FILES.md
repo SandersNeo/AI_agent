@@ -165,7 +165,7 @@
 Запуск:
 
 ```bash
-python automation/run_tests.py
+python automation/ops/run_tests.py
 ```
 
 ## Текущие ограничения

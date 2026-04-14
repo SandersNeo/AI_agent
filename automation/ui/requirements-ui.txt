@@ -1,0 +1,4 @@
+# Зависимости для desktop UI-тестов 1С через Python
+# Установка: pip install -r automation/ui/requirements-ui.txt
+pywinauto>=0.6.8
+pywin32>=306

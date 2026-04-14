@@ -6,17 +6,19 @@ rem UTF-8 для вывода Java (кириллица в логах)
 set "JAVA_OPTS=-Dfile.encoding=UTF-8"
 
 set "SCRIPT_DIR=%~dp0"
-set "LOGS_DIR=%SCRIPT_DIR%logs"
+set "AUTOMATION_DIR=%SCRIPT_DIR%.."
+set "REPO_ROOT=%AUTOMATION_DIR%\.."
+set "LOGS_DIR=%AUTOMATION_DIR%\logs"
 set "JAR=%SCRIPT_DIR%bsl-language-server-0.28.4-exec.jar"
-set "XML_DIR=%SCRIPT_DIR%..\xml"
-set "CONFIG=%SCRIPT_DIR%..\.bsl-language-server.json"
+set "XML_DIR=%REPO_ROOT%\xml"
+set "CONFIG=%REPO_ROOT%\.bsl-language-server.json"
 
 if not exist "%LOGS_DIR%" mkdir "%LOGS_DIR%"
 
 if not exist "%JAR%" (
     echo Ошибка: JAR не найден: %JAR%
     echo Скачайте bsl-language-server с https://github.com/1c-syntax/bsl-language-server/releases
-    echo и поместите bsl-language-server-*-exec.jar в папку automation
+    echo и поместите bsl-language-server-*-exec.jar в папку automation\bsl
     exit /b 1
 )
 

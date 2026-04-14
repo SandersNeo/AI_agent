@@ -19,10 +19,12 @@ import sys
 import os
 import subprocess
 
-# Поддержка запуска из каталога automation
+# Поддержка запуска из каталога automation/ops
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-if _script_dir not in sys.path:
-    sys.path.insert(0, _script_dir)
+_automation_dir = os.path.dirname(_script_dir)
+for _path in (_script_dir, _automation_dir):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from com_1c import connect_to_1c, call_procedure
 from com_1c.com_connector import setup_console_encoding

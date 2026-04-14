@@ -5,7 +5,7 @@
 ## Установка
 
 ```bash
-cd automation
+cd automation/com_1c
 pip install -r requirements-com.txt
 ```
 
@@ -76,7 +76,7 @@ copy .env.example .env
 # 1C_CONNECTION_STRING=File="D:\EDT_base\КонфигурацияТест";
 ```
 
-- **Python**: `update_1c.py` при старте читает `.env` (1C_CONNECTION_STRING).
+- **Python**: `automation/ops/update_1c.py` при старте читает `.env` (1C_CONNECTION_STRING).
 - **Python**: `automation/vanessa/update_and_run_vanessa.py` также читает `.env`.
 - **Python** (`python -m com_1c`, `run-com.ps1`): используется `python-dotenv`, загружается `.env` из корня проекта.
 - Файл `.env` в `.gitignore` — в репозиторий не попадает. В репозитории лежит только `.env.example`.

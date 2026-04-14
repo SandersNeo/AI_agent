@@ -6,16 +6,16 @@
 Расширение загружается сразу из xml/, без промежуточного .cfe.
 
 Примеры:
-    python update_1c.py
+    python automation/ops/update_1c.py
         xml → конфигурация → обновление БД → запуск 1С
 
-    python update_1c.py --skip-run-client
+    python automation/ops/update_1c.py --skip-run-client
         xml → конфигурация → обновление БД (без запуска)
 
-    python update_1c.py --no-build-from-xml
+    python automation/ops/update_1c.py --no-build-from-xml
         Только обновление БД и запуск (расширение уже в конфигурации)
 
-    python update_1c.py --dump-cfe
+    python automation/ops/update_1c.py --dump-cfe
         Дополнительно выгрузить .cfe в bin/ (для распространения)
 """
 
@@ -24,10 +24,12 @@ import os
 import subprocess
 import sys
 
-# Поддержка запуска из каталога automation
+# Поддержка запуска из каталога automation/ops
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-if _script_dir not in sys.path:
-    sys.path.insert(0, _script_dir)
+_automation_dir = os.path.dirname(_script_dir)
+for _path in (_script_dir, _automation_dir):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from com_1c.config import get_connection_string, get_platform_85
 from com_1c.com_connector import setup_console_encoding
@@ -68,7 +70,7 @@ def main():
     args = parser.parse_args()
     setup_console_encoding()
 
-    project_root = os.path.dirname(_script_dir)
+    project_root = os.path.dirname(_automation_dir)
     log_dir = os.path.join(_script_dir, "logs")
     xml_path = os.path.join(project_root, "xml")
     cfe_name = args.output if args.output else f"{EXTENSION_NAME}.cfe"

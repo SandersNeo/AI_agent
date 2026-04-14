@@ -6,11 +6,11 @@
 
 В репозитории добавлен scaffold и runtime:
 
-- [`tau_bridge.py`](../automation/tau_bridge.py) — CLI bridge между benchmark runner и COM-входом 1С-агента;
-- [`tau_bridge_config.example.json`](../automation/tau_bridge_config.example.json) — шаблон конфига;
-- [`tau2_1c_agent.py`](../automation/tau2_1c_agent.py) — custom agent для Tau-Bench;
-- [`run_tau_with_1c_agent.py`](../automation/run_tau_with_1c_agent.py) — programmatic runner;
-- [`run_tau_bench.py`](../automation/run_tau_bench.py) — внешний запуск официального Tau-Bench как отдельного benchmark-контура.
+- [`tau_bridge.py`](../automation/tau/tau_bridge.py) — CLI bridge между benchmark runner и COM-входом 1С-агента;
+- [`tau_bridge_config.example.json`](../automation/tau/tau_bridge_config.example.json) — шаблон конфига;
+- [`tau2_1c_agent.py`](../automation/tau/tau2_1c_agent.py) — custom agent для Tau-Bench;
+- [`run_tau_with_1c_agent.py`](../automation/tau/run_tau_with_1c_agent.py) — programmatic runner;
+- [`run_tau_bench.py`](../automation/tau/run_tau_bench.py) — внешний запуск официального Tau-Bench как отдельного benchmark-контура.
 
 ## Текущий режим scaffold
 
@@ -138,9 +138,8 @@ Bridge поддерживает два режима:
 ## Примеры запуска
 
 ```powershell
-cd automation
-python tau_bridge.py --text "Покажи топ контрагентов" --task-id demo_001
-python tau_bridge.py --config .\tau_bridge_config.example.json --request .\sample_request.json --output .\bridge_result.json
+python automation\tau\tau_bridge.py --text "Покажи топ контрагентов" --task-id demo_001
+python automation\tau\tau_bridge.py --config .\automation\tau\tau_bridge_config.example.json --request .\automation\tau\sample_request.json --output .\automation\logs\bridge_result.json
 ```
 
 ## Что делать дальше в этом репозитории

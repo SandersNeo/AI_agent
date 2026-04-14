@@ -2,8 +2,8 @@
 
 В репозиторий добавлен отдельный внешний контур оценки через официальный `tau2` CLI. Он нужен не вместо локального benchmark, а рядом с ним:
 
-- `automation/test_examples.py` остаётся основным KPI для сценариев 1С;
-- `automation/run_tau_bench.py` даёт внешний референс на публичном benchmark;
+- `automation/tau/test_examples.py` остаётся основным KPI для сценариев 1С;
+- `automation/tau/run_tau_bench.py` даёт внешний референс на публичном benchmark;
 - результаты нужно читать раздельно, не сливая в один score.
 
 ## Что даёт интеграция
@@ -34,20 +34,20 @@ git clone https://github.com/sierra-research/tau2-bench .\vendor\tau2-bench
 
 ## Быстрый запуск
 
-Из каталога `automation`:
+Из корня репозитория:
 
 ```powershell
-python run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
-python run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
-python run_tau_bench.py --compare-local-report .\logs\examples_20260408_090000\report.json
+python automation\tau\run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
+python automation\tau\run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
+python automation\tau\run_tau_bench.py --compare-local-report .\logs\examples_20260408_090000\report.json
 ```
 
 Для запуска именно вашего 1С-backed custom agent используйте:
 
 ```powershell
 cd vendor\tau2-bench
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --evaluation-type all
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --evaluation-type all_with_nl_assertions
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --evaluation-type all
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --evaluation-type all_with_nl_assertions
 ```
 
 ## Режимы стоимости
@@ -63,10 +63,10 @@ uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --user-llm
 
 ```powershell
 cd vendor\tau2-bench
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --cost-mode free --num-tasks 7 --num-trials 1
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --cost-mode cheap --num-tasks 7 --num-trials 1
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain telecom --cost-mode cheap --user-llm gpt-4o --num-tasks 1
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain telecom --cost-mode full --user-llm gpt-4o --evaluation-type all
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --cost-mode free --num-tasks 7 --num-trials 1
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --cost-mode cheap --num-tasks 7 --num-trials 1
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain telecom --cost-mode cheap --user-llm gpt-4o --num-tasks 1
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain telecom --cost-mode full --user-llm gpt-4o --evaluation-type all
 ```
 
 Что важно:

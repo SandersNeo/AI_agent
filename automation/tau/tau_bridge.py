@@ -19,8 +19,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-if str(_SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPT_DIR))
+_AUTOMATION_DIR = _SCRIPT_DIR.parent
+for _path in (str(_SCRIPT_DIR), str(_AUTOMATION_DIR)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from com_1c import connect_to_1c, call_procedure, get_enum_value  # noqa: E402
 from com_1c.com_connector import setup_console_encoding  # noqa: E402

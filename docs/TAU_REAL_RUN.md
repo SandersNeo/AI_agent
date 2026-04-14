@@ -4,9 +4,9 @@
 
 ## Что добавлено
 
-- [`run_tau_with_1c_agent.py`](../automation/run_tau_with_1c_agent.py) — programmatic runner, который регистрирует custom agent в Tau-Bench.
-- [`tau2_1c_agent.py`](../automation/tau2_1c_agent.py) — custom `HalfDuplexAgent`, проксирующий ходы в 1С через bridge.
-- [`tau_bridge.py`](../automation/tau_bridge.py) — теперь поддерживает session mode.
+- [`run_tau_with_1c_agent.py`](../automation/tau/run_tau_with_1c_agent.py) — programmatic runner, который регистрирует custom agent в Tau-Bench.
+- [`tau2_1c_agent.py`](../automation/tau/tau2_1c_agent.py) — custom `HalfDuplexAgent`, проксирующий ходы в 1С через bridge.
+- [`tau_bridge.py`](../automation/tau/tau_bridge.py) — теперь поддерживает session mode.
 - [`ИИА_ДиалогCOM`](../xml/CommonModules/ИИА_ДиалогCOM/Ext/Module.bsl) — добавлены `СоздатьBridgeСессию`, `ВыполнитьХодBridge`, `ЗакрытьBridgeСессию`.
 
 ## Что нужно в окружении
@@ -28,28 +28,28 @@
 
 ```powershell
 cd vendor\tau2-bench
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --num-tasks 1 --num-trials 1 --evaluation-type all
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --num-tasks 1 --num-trials 1 --evaluation-type all
 ```
 
 Бесплатный regression smoke-run для `mock`:
 
 ```powershell
 cd vendor\tau2-bench
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --cost-mode free --num-tasks 7 --num-trials 1
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --cost-mode free --num-tasks 7 --num-trials 1
 ```
 
 Smoke-run с NL judge:
 
 ```powershell
 cd vendor\tau2-bench
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --num-tasks 1 --num-trials 1 --evaluation-type all_with_nl_assertions
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain mock --user-llm gpt-4o --num-tasks 1 --num-trials 1 --evaluation-type all_with_nl_assertions
 ```
 
 Более реальный run:
 
 ```powershell
 cd vendor\tau2-bench
-uv run python ..\..\automation\run_tau_with_1c_agent.py --domain telecom --user-llm gpt-4o --num-tasks 5 --num-trials 1 --verbose-logs --evaluation-type all
+uv run python ..\..\automation\tau\run_tau_with_1c_agent.py --domain telecom --user-llm gpt-4o --num-tasks 5 --num-trials 1 --verbose-logs --evaluation-type all
 ```
 
 ## Что означают cost-mode
@@ -71,7 +71,7 @@ uv run python ..\..\automation\run_tau_with_1c_agent.py --domain telecom --user-
 1. Runner подключает `vendor/tau2-bench/src` в `PYTHONPATH`.
 2. Регистрирует custom agent `onec_tau_agent`.
 3. Tau-Bench orchestrator вызывает этот агент turn-by-turn.
-4. Агент отправляет ход в [`tau_bridge.py`](../automation/tau_bridge.py).
+4. Агент отправляет ход в [`tau_bridge.py`](../automation/tau/tau_bridge.py).
 5. Bridge работает через COM session API в 1С.
 6. Ответ агента возвращается в Tau-Bench как `AssistantMessage`.
 

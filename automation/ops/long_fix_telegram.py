@@ -21,9 +21,12 @@ import shutil
 from pathlib import Path
 
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-if _script_dir not in sys.path:
-    sys.path.insert(0, _script_dir)
 _root = os.path.dirname(_script_dir)
+_automation_dir = os.path.dirname(_script_dir)
+_tau_dir = os.path.join(_automation_dir, "tau")
+for _path in (_script_dir, _automation_dir, _tau_dir):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 try:
     from dotenv import load_dotenv
@@ -288,7 +291,7 @@ def cmd_run(args):
         if not getattr(args, "skip_update", False):
             print("Обновление расширения и БД...")
             if not run_update_1c():
-                print("Ошибка обновления БД. Запустите: python update_1c.py --skip-run-client", file=sys.stderr)
+                print("Ошибка обновления БД. Запустите: python automation/ops/update_1c.py --skip-run-client", file=sys.stderr)
                 return 1
         else:
             print("--skip-update: пропуск обновления БД")

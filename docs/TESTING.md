@@ -8,16 +8,15 @@
 
 ## Запуск через run_tests.py
 
-Скрипт `automation/run_tests.py` запускает тесты через COM без открытия 1С:
+Скрипт `automation/ops/run_tests.py` запускает тесты через COM без открытия 1С:
 
 ```bash
-cd automation
-python run_tests.py                    # бесплатные тесты (по умолчанию)
-python run_tests.py --dry-run          # тесты холостого хода (mock, без ИИ)
-python run_tests.py --with-ai          # все тесты, включая с вызовом ИИ
-python run_tests.py --ai-only          # только боевые тесты с ИИ
-python run_tests.py --test ТестRunQuery # один тест
-python run_tests.py --skip-update      # пропустить обновление БД
+python automation/ops/run_tests.py                    # бесплатные тесты (по умолчанию)
+python automation/ops/run_tests.py --dry-run          # тесты холостого хода (mock, без ИИ)
+python automation/ops/run_tests.py --with-ai          # все тесты, включая с вызовом ИИ
+python automation/ops/run_tests.py --ai-only          # только боевые тесты с ИИ
+python automation/ops/run_tests.py --test ТестRunQuery # один тест
+python automation/ops/run_tests.py --skip-update      # пропустить обновление БД
 ```
 
 Перед тестами выполняется обновление БД (xml → конфигурация → UpdateDBCfg), если не указан `--skip-update`.
@@ -48,24 +47,23 @@ python run_tests.py --skip-update      # пропустить обновлени
 
 **ИИА_ДиалогCOM.СоздатьДиалогИВыполнитьАгентаСинхронно(Пользователь, Текст, ТипДиалога)** — создаёт диалог, отправляет сообщение и выполняет оркестратор синхронно (без фоновых заданий). Используется для автотестов и скриптов.
 
-CLI-скрипт `automation/run_dialog.py`:
+CLI-скрипт `automation/tau/run_dialog.py`:
 
 ```bash
-python run_dialog.py --text "Покажи всех контрагентов" --type Запрос1С
-python run_dialog.py --text "Создай документ" --type Agent --log-file run_log.txt
+python automation/tau/run_dialog.py --text "Покажи всех контрагентов" --type Запрос1С
+python automation/tau/run_dialog.py --text "Создай документ" --type Agent --log-file run_log.txt
 ```
 
 Подробнее: [automation/com_1c/README.md](../automation/com_1c/README.md)
 
 ## Внешний benchmark: Tau-Bench
 
-Скрипт `automation/run_tau_bench.py` запускает официальный `tau2` CLI в отдельном checkout Tau-Bench и складывает артефакты в `automation/logs/tau_bench/`.
+Скрипт `automation/tau/run_tau_bench.py` запускает официальный `tau2` CLI в отдельном checkout Tau-Bench и складывает артефакты в `automation/logs/tau_bench/`.
 
 ```bash
-cd automation
-python run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
-python run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
-python run_tau_bench.py --compare-local-report .\logs\examples_20260408_090000\report.json
+python automation/tau/run_tau_bench.py --agent-llm gpt-4.1 --user-llm gpt-4.1
+python automation/tau/run_tau_bench.py --domain telecom --num-tasks 25 --num-trials 2
+python automation/tau/run_tau_bench.py --compare-local-report .\logs\examples_20260408_090000\report.json
 ```
 
 Нужен локальный checkout Tau-Bench и `uv`. Путь задаётся через `TAU_BENCH_REPO` или `--tau-repo`.
@@ -81,15 +79,50 @@ Bridge для запуска именно 1С-агента внутри внеш
 
 Подробнее: [automation/vanessa/TestAIAgent_README.md](../automation/vanessa/TestAIAgent_README.md)
 
+## Python UI через pywinauto
+
+Для desktop UI-тестов тонкого клиента 1С можно использовать `pywinauto` без Vanessa.
+
+Установка:
+
+```bash
+pip install -r automation/ui/requirements-ui.txt
+```
+
+Запуск smoke-сценария:
+
+```bash
+python automation/ui/ui_1c_agent_test.py
+python automation/ui/ui_1c_agent_test.py --prompt "ответь одним словом: ОК"
+```
+
+Запуск в отдельном окне PowerShell, чтобы не ронять Cursor IDE:
+
+```batch
+automation\ui\run_ui_test_external.cmd
+automation\ui\run_ui_test_external.cmd --leave-open
+automation\ui\run_ui_test_external.cmd --prompt "ответь одним словом: ОК"
+```
+
+Скрипт:
+- запускает тонкий клиент 1С;
+- открывает форму `ИИ Агент` через боковую навигацию;
+- создаёт новый диалог;
+- отправляет сообщение;
+- ждёт ответа и проверяет текст в окне.
+
+Логи и артефакты:
+- лог: `automation/logs/ui_pywinauto.log`
+- скриншоты и dump окна при ошибке: `automation/logs/ui_artifacts/`
+
 ## Линтер BSL (BSL Language Server)
 
 Статический анализ BSL-кода в XML-выгрузке:
 
 ```batch
-cd automation
-run-bsl-analyze.bat
+automation\bsl\run-bsl-analyze.bat
 ```
 
 Результаты: `automation/logs/bsl-json.json`, `automation/logs/bsl-summary.txt`.
 
-Подробнее: [automation/BSL-README.md](../automation/BSL-README.md)
+Подробнее: [automation/bsl/BSL-README.md](../automation/bsl/BSL-README.md)
