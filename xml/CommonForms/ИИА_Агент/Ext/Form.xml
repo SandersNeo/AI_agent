@@ -143,56 +143,60 @@
 							<ContextMenu name="ТекущийТекстКонтекстноеМеню" id="42"/>
 							<ExtendedTooltip name="ТекущийТекстРасширеннаяПодсказка" id="43"/>
 						</InputField>
-						<UsualGroup name="ГруппаВложения" id="205">
+						<UsualGroup name="ГруппаДействия" id="205">
 							<Title>
 								<v8:item>
 									<v8:lang>ru</v8:lang>
-									<v8:content>Группа вложения</v8:content>
+									<v8:content>Группа действия</v8:content>
 								</v8:item>
 							</Title>
-							<Group>Vertical</Group>
-							<Representation>None</Representation>
-							<ShowTitle>false</ShowTitle>
-							<ExtendedTooltip name="ГруппаВложенияРасширеннаяПодсказка" id="206"/>
-							<ChildItems>
-								<Button name="ПрикрепитьФайл" id="210">
-									<Type>UsualButton</Type>
-									<CommandName>Form.Command.ПрикрепитьФайл</CommandName>
-									<ExtendedTooltip name="ПрикрепитьФайлРасширеннаяПодсказка" id="211"/>
-								</Button>
-							</ChildItems>
-						</UsualGroup>
-						<UsualGroup name="ГруппаОтправить" id="71">
-							<Title>
-								<v8:item>
-									<v8:lang>ru</v8:lang>
-									<v8:content>Группа отправить</v8:content>
-								</v8:item>
-							</Title>
-							<Width>20</Width>
+							<Width>24</Width>
 							<HorizontalStretch>false</HorizontalStretch>
 							<Group>Vertical</Group>
 							<Representation>None</Representation>
 							<ShowTitle>false</ShowTitle>
-							<ExtendedTooltip name="ГруппаОтправитьРасширеннаяПодсказка" id="72"/>
+							<ExtendedTooltip name="ГруппаДействияРасширеннаяПодсказка" id="206"/>
 							<ChildItems>
-								<Button name="Отправить" id="49">
-									<Type>UsualButton</Type>
-									<Width>15</Width>
-									<HorizontalStretch>true</HorizontalStretch>
-									<VerticalStretch>true</VerticalStretch>
-									<CommandName>Form.Command.Отправить</CommandName>
-									<ExtendedTooltip name="ОтправитьРасширеннаяПодсказка" id="50"/>
-								</Button>
-								<InputField name="ТекущийТипСообщения" id="44">
-									<DataPath>ТекущийТипДиалога</DataPath>
-									<TitleLocation>None</TitleLocation>
-									<Width>12</Width>
-									<MaxWidth>8</MaxWidth>
-									<HorizontalStretch>true</HorizontalStretch>
-									<ContextMenu name="ТекущийТипСообщенияКонтекстноеМеню" id="45"/>
-									<ExtendedTooltip name="ТекущийТипСообщенияРасширеннаяПодсказка" id="46"/>
-								</InputField>
+								<UsualGroup name="ГруппаОтправить" id="71">
+									<Title>
+										<v8:item>
+											<v8:lang>ru</v8:lang>
+											<v8:content>Группа отправить</v8:content>
+										</v8:item>
+									</Title>
+									<Group>Vertical</Group>
+									<Representation>None</Representation>
+									<ShowTitle>false</ShowTitle>
+									<ExtendedTooltip name="ГруппаОтправитьРасширеннаяПодсказка" id="72"/>
+									<ChildItems>
+										<InputField name="ТекущийТипСообщения" id="44">
+											<DataPath>ТекущийТипДиалога</DataPath>
+											<TitleLocation>None</TitleLocation>
+											<HorizontalStretch>true</HorizontalStretch>
+											<ContextMenu name="ТекущийТипСообщенияКонтекстноеМеню" id="45"/>
+											<ExtendedTooltip name="ТекущийТипСообщенияРасширеннаяПодсказка" id="46"/>
+										</InputField>
+										<Button name="Отправить" id="49">
+											<Type>UsualButton</Type>
+											<Height>2</Height>
+											<HorizontalStretch>true</HorizontalStretch>
+											<VerticalStretch>false</VerticalStretch>
+											<CommandName>Form.Command.Отправить</CommandName>
+											<ExtendedTooltip name="ОтправитьРасширеннаяПодсказка" id="50"/>
+										</Button>
+										<LabelField name="СсылкаПрикрепитьФайл" id="210">
+											<DataPath>СсылкаПрикрепитьФайл</DataPath>
+											<TitleLocation>None</TitleLocation>
+											<Hiperlink>true</Hiperlink>
+											<HorizontalStretch>true</HorizontalStretch>
+											<ContextMenu name="СсылкаПрикрепитьФайлКонтекстноеМеню" id="211"/>
+											<ExtendedTooltip name="СсылкаПрикрепитьФайлРасширеннаяПодсказка" id="212"/>
+											<Events>
+												<Event name="Click">СсылкаПрикрепитьФайлНажатие</Event>
+											</Events>
+										</LabelField>
+									</ChildItems>
+								</UsualGroup>
 								<UsualGroup name="ГруппаПодтверждения" id="300">
 									<Title>
 										<v8:item>
@@ -201,26 +205,60 @@
 										</v8:item>
 									</Title>
 									<Group>Vertical</Group>
-									<Representation>None</Representation>
+									<Representation>WeakSeparation</Representation>
 									<ShowTitle>false</ShowTitle>
 									<Visible>false</Visible>
 									<ExtendedTooltip name="ГруппаПодтвержденияРасширеннаяПодсказка" id="301"/>
 									<ChildItems>
-										<Button name="ПодтвердитьДействие" id="302">
+										<LabelField name="ТекстПодтверждения" id="302">
+											<DataPath>ТекстПодтверждения</DataPath>
+											<TitleLocation>None</TitleLocation>
+											<HorizontalStretch>true</HorizontalStretch>
+											<ContextMenu name="ТекстПодтвержденияКонтекстноеМеню" id="303"/>
+											<ExtendedTooltip name="ТекстПодтвержденияРасширеннаяПодсказка" id="304"/>
+										</LabelField>
+										<Button name="ПодтвердитьДействие" id="305">
 											<Type>UsualButton</Type>
+											<HorizontalStretch>true</HorizontalStretch>
 											<CommandName>Form.Command.ПодтвердитьДействие</CommandName>
-											<ExtendedTooltip name="ПодтвердитьДействиеРасширеннаяПодсказка" id="303"/>
+											<ExtendedTooltip name="ПодтвердитьДействиеРасширеннаяПодсказка" id="306"/>
 										</Button>
-										<Button name="ОтклонитьДействие" id="304">
-											<Type>UsualButton</Type>
-											<CommandName>Form.Command.ОтклонитьДействие</CommandName>
-											<ExtendedTooltip name="ОтклонитьДействиеРасширеннаяПодсказка" id="305"/>
-										</Button>
-										<Button name="БезПодтверждения" id="306">
-											<Type>UsualButton</Type>
-											<CommandName>Form.Command.БезПодтверждения</CommandName>
-											<ExtendedTooltip name="БезПодтвержденияРасширеннаяПодсказка" id="307"/>
-										</Button>
+										<UsualGroup name="ГруппаСсылкиПодтверждения" id="307">
+											<Title>
+												<v8:item>
+													<v8:lang>ru</v8:lang>
+													<v8:content>Группа ссылки подтверждения</v8:content>
+												</v8:item>
+											</Title>
+											<Group>AlwaysHorizontal</Group>
+											<Representation>None</Representation>
+											<ShowTitle>false</ShowTitle>
+											<ExtendedTooltip name="ГруппаСсылкиПодтвержденияРасширеннаяПодсказка" id="308"/>
+											<ChildItems>
+												<LabelField name="СсылкаОтклонитьДействие" id="309">
+													<DataPath>СсылкаОтклонитьДействие</DataPath>
+													<TitleLocation>None</TitleLocation>
+													<Hiperlink>true</Hiperlink>
+													<HorizontalStretch>true</HorizontalStretch>
+													<ContextMenu name="СсылкаОтклонитьДействиеКонтекстноеМеню" id="310"/>
+													<ExtendedTooltip name="СсылкаОтклонитьДействиеРасширеннаяПодсказка" id="311"/>
+													<Events>
+														<Event name="Click">СсылкаОтклонитьДействиеНажатие</Event>
+													</Events>
+												</LabelField>
+												<LabelField name="СсылкаБезПодтверждения" id="312">
+													<DataPath>СсылкаБезПодтверждения</DataPath>
+													<TitleLocation>None</TitleLocation>
+													<Hiperlink>true</Hiperlink>
+													<HorizontalStretch>true</HorizontalStretch>
+													<ContextMenu name="СсылкаБезПодтвержденияКонтекстноеМеню" id="313"/>
+													<ExtendedTooltip name="СсылкаБезПодтвержденияРасширеннаяПодсказка" id="314"/>
+													<Events>
+														<Event name="Click">СсылкаБезПодтвержденияНажатие</Event>
+													</Events>
+												</LabelField>
+											</ChildItems>
+										</UsualGroup>
 									</ChildItems>
 								</UsualGroup>
 							</ChildItems>
@@ -372,85 +410,34 @@
 								</InputField>
 							</ChildItems>
 						</Table>
-						<LabelDecoration name="ЗаголовокИзмененныеОбъекты" id="168">
-							<Title formatted="false">
+						<UsualGroup name="ГруппаСсылкиНаОбъекты" id="171">
+							<Title>
 								<v8:item>
 									<v8:lang/>
-									<v8:content>Измененные объекты</v8:content>
+									<v8:content>Группа ссылок на объекты</v8:content>
 								</v8:item>
 							</Title>
-							<ContextMenu name="ЗаголовокИзмененныеОбъектыКонтекстноеМеню" id="169"/>
-							<ExtendedTooltip name="ЗаголовокИзмененныеОбъектыРасширеннаяПодсказка" id="170"/>
-						</LabelDecoration>
-						<Table name="ИзмененныеОбъекты" id="171">
-							<Representation>List</Representation>
-							<CommandBarLocation>None</CommandBarLocation>
-							<AutoMaxWidth>false</AutoMaxWidth>
 							<MaxWidth>40</MaxWidth>
 							<Height>8</Height>
 							<AutoMaxHeight>false</AutoMaxHeight>
-							<RowSelectionMode>Cell</RowSelectionMode>
-							<VerticalStretch>false</VerticalStretch>
-							<DataPath>ИзмененныеОбъекты</DataPath>
-							<CommandSet>
-								<ExcludedCommand>Add</ExcludedCommand>
-								<ExcludedCommand>CancelSearch</ExcludedCommand>
-								<ExcludedCommand>Change</ExcludedCommand>
-								<ExcludedCommand>Copy</ExcludedCommand>
-								<ExcludedCommand>CopyToClipboard</ExcludedCommand>
-								<ExcludedCommand>Delete</ExcludedCommand>
-								<ExcludedCommand>EndEdit</ExcludedCommand>
-								<ExcludedCommand>Find</ExcludedCommand>
-								<ExcludedCommand>FindByCurrentValue</ExcludedCommand>
-								<ExcludedCommand>MoveDown</ExcludedCommand>
-								<ExcludedCommand>MoveUp</ExcludedCommand>
-								<ExcludedCommand>OutputList</ExcludedCommand>
-								<ExcludedCommand>SearchEverywhere</ExcludedCommand>
-								<ExcludedCommand>SearchHistory</ExcludedCommand>
-								<ExcludedCommand>SelectAll</ExcludedCommand>
-								<ExcludedCommand>ShowMultipleSelection</ExcludedCommand>
-								<ExcludedCommand>ShowRowRearrangement</ExcludedCommand>
-								<ExcludedCommand>SortListAsc</ExcludedCommand>
-								<ExcludedCommand>SortListDesc</ExcludedCommand>
-							</CommandSet>
-							<RowFilter xsi:nil="true"/>
-							<ContextMenu name="ИзмененныеОбъектыКонтекстноеМеню" id="172"/>
-							<AutoCommandBar name="ИзмененныеОбъектыКоманднаяПанель" id="173"/>
-							<ExtendedTooltip name="ИзмененныеОбъектыРасширеннаяПодсказка" id="174"/>
-							<SearchStringAddition name="ИзмененныеОбъектыСтрокаПоиска" id="196">
-								<AdditionSource>
-									<Item>ИзмененныеОбъекты</Item>
-									<Type>SearchStringRepresentation</Type>
-								</AdditionSource>
-								<ContextMenu name="ИзмененныеОбъектыСтрокаПоискаКонтекстноеМеню" id="197"/>
-								<ExtendedTooltip name="ИзмененныеОбъектыСтрокаПоискаРасширеннаяПодсказка" id="198"/>
-							</SearchStringAddition>
-							<ViewStatusAddition name="ИзмененныеОбъектыСостояниеПросмотра" id="199">
-								<AdditionSource>
-									<Item>ИзмененныеОбъекты</Item>
-									<Type>ViewStatusRepresentation</Type>
-								</AdditionSource>
-								<ContextMenu name="ИзмененныеОбъектыСостояниеПросмотраКонтекстноеМеню" id="200"/>
-								<ExtendedTooltip name="ИзмененныеОбъектыСостояниеПросмотраРасширеннаяПодсказка" id="201"/>
-							</ViewStatusAddition>
-							<SearchControlAddition name="ИзмененныеОбъектыУправлениеПоиском" id="202">
-								<AdditionSource>
-									<Item>ИзмененныеОбъекты</Item>
-									<Type>SearchControl</Type>
-								</AdditionSource>
-								<ContextMenu name="ИзмененныеОбъектыУправлениеПоискомКонтекстноеМеню" id="203"/>
-								<ExtendedTooltip name="ИзмененныеОбъектыУправлениеПоискомРасширеннаяПодсказка" id="204"/>
-							</SearchControlAddition>
+							<Group>Vertical</Group>
+							<Representation>None</Representation>
+							<ShowTitle>false</ShowTitle>
+							<Visible>false</Visible>
+							<ExtendedTooltip name="ГруппаСсылкиНаОбъектыРасширеннаяПодсказка" id="172"/>
 							<ChildItems>
-								<InputField name="ИзмененныеОбъектыСсылкаНаОбъект" id="175">
-									<DataPath>ИзмененныеОбъекты.СсылкаНаОбъект</DataPath>
-									<EditMode>EnterOnInput</EditMode>
-									<AutoEditMode>true</AutoEditMode>
-									<ContextMenu name="ИзмененныеОбъектыСсылкаНаОбъектКонтекстноеМеню" id="176"/>
-									<ExtendedTooltip name="ИзмененныеОбъектыСсылкаНаОбъектРасширеннаяПодсказка" id="177"/>
-								</InputField>
+								<LabelDecoration name="ЗаголовокСсылкиНаОбъекты" id="173">
+									<Title formatted="false">
+										<v8:item>
+											<v8:lang/>
+											<v8:content>Ссылки на объекты</v8:content>
+										</v8:item>
+									</Title>
+									<ContextMenu name="ЗаголовокСсылкиНаОбъектыКонтекстноеМеню" id="174"/>
+									<ExtendedTooltip name="ЗаголовокСсылкиНаОбъектыРасширеннаяПодсказка" id="175"/>
+								</LabelDecoration>
 							</ChildItems>
-						</Table>
+						</UsualGroup>
 						<LabelDecoration name="ЗаголовокDecisionTimeline" id="320">
 							<Title formatted="false">
 								<v8:item>
@@ -504,6 +491,66 @@
 				<v8:item>
 					<v8:lang>ru</v8:lang>
 					<v8:content>Текущий текст</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="СсылкаПрикрепитьФайл" id="330">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Ссылка прикрепить файл</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ТекстПодтверждения" id="331">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Текст подтверждения</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="СсылкаОтклонитьДействие" id="332">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Ссылка отклонить действие</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="СсылкаБезПодтверждения" id="333">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Ссылка без подтверждения</v8:content>
 				</v8:item>
 			</Title>
 			<Type>
