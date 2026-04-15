@@ -436,6 +436,17 @@
 									<ContextMenu name="ЗаголовокСсылкиНаОбъектыКонтекстноеМеню" id="174"/>
 									<ExtendedTooltip name="ЗаголовокСсылкиНаОбъектыРасширеннаяПодсказка" id="175"/>
 								</LabelDecoration>
+								<LabelField name="СсылкаТабличногоДокумента" id="334">
+									<DataPath>СсылкаТабличногоДокумента</DataPath>
+									<Visible>false</Visible>
+									<TitleLocation>None</TitleLocation>
+									<Hiperlink>true</Hiperlink>
+									<ContextMenu name="СсылкаТабличногоДокументаКонтекстноеМеню" id="335"/>
+									<ExtendedTooltip name="СсылкаТабличногоДокументаРасширеннаяПодсказка" id="336"/>
+									<Events>
+										<Event name="Click">СсылкаТабличногоДокументаНажатие</Event>
+									</Events>
+								</LabelField>
 							</ChildItems>
 						</UsualGroup>
 						<LabelDecoration name="ЗаголовокDecisionTimeline" id="320">
@@ -746,6 +757,21 @@
 				<v8:item>
 					<v8:lang>ru</v8:lang>
 					<v8:content>Decision Timeline</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="СсылкаТабличногоДокумента" id="337">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Ссылка табличного документа</v8:content>
 				</v8:item>
 			</Title>
 			<Type>
