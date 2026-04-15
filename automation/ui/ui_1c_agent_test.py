@@ -14,6 +14,7 @@ Desktop UI тест формы ИИ агента без Vanessa и без COM.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import os
 import subprocess
 import sys
@@ -177,9 +178,10 @@ class OneCAgentUiTest:
     def _enter_prompt(self) -> None:
         self.logger.info("Вводим пользовательское сообщение.")
         edit = self._locate_prompt_input()
-        self._click(edit)
-        keyboard.send_keys("^a{BACKSPACE}", pause=0.05)
-        keyboard.send_keys(self._escape_for_send_keys(self.config.prompt), with_spaces=True, pause=0.02)
+        self._set_text_to_input(edit, self.config.prompt)
+        current_value = self._read_input_value(edit)
+        if current_value:
+            self.logger.info(f"Поле ввода содержит: {current_value[:120]!r}")
         time.sleep(1)
         full_text = self._window_dump_text(self.main_window)
         if self.config.prompt.lower() not in full_text.lower():
@@ -189,6 +191,7 @@ class OneCAgentUiTest:
         self.logger.info("Нажимаем 'Отправить'.")
         button = self._find_descendant_by_titles(["Отправить", "Send"], ["Button"], 20)
         self._click(button)
+        self._handle_pending_approval()
 
     def _wait_expected_response(self) -> None:
         self.logger.info("Ждём ожидаемый ответ агента.")
@@ -197,6 +200,7 @@ class OneCAgentUiTest:
         error_markers = ("задача завершена с ошибкой", "ошибка api", "ошибка:")
         while time.time() < deadline:
             self._raise_if_error_dialog()
+            self._handle_pending_approval()
             text_dump = self._window_dump_text(self.main_window).lower()
             if expected in text_dump:
                 return
@@ -205,6 +209,23 @@ class OneCAgentUiTest:
                     raise RuntimeError(f"В форме агента зафиксирована ошибка:\n{text_dump}")
             time.sleep(2)
         raise RuntimeError(f"Не дождались ожидаемого текста ответа: {self.config.expected_text!r}")
+
+    def _handle_pending_approval(self) -> None:
+        full_text = self._window_dump_text(self.main_window).lower()
+        if "требуется подтверждение действия" not in full_text:
+            return
+        self.logger.info("Обнаружен pending approval, подтверждаем выполнение.")
+        for titles in (
+            ["Выполнять без подтверждения", "Execute without confirmation"],
+            ["Подтвердить", "Approve"],
+        ):
+            try:
+                button = self._find_descendant_by_titles(titles, ["Button"], 5)
+                self._click(button)
+                time.sleep(1)
+                return
+            except Exception:
+                continue
 
     def _find_descendant_by_titles(self, titles: list[str], control_types: list[str], timeout: int):
         deadline = time.time() + timeout
@@ -293,24 +314,265 @@ class OneCAgentUiTest:
         candidates = []
         for item in self._iter_descendants():
             ctype = self._safe_control_type(item)
-            if ctype not in ("Edit", "Document", "Pane"):
+            if ctype != "Edit":
                 continue
             text = self._safe_text(item).strip().lower()
             rect = item.rectangle()
             if rect.width() < 300 or rect.height() < 40:
                 continue
-            if "текущий диалог" in text or "decision timeline" in text:
+            if rect.left < 240 or rect.top < 140 or rect.top > 280:
+                continue
+            if rect.right > 760:
+                continue
+            if "search" in text or "текущий диалог" in text or "decision timeline" in text:
                 continue
             candidates.append(item)
         if not candidates:
             raise RuntimeError("Не найдено поле ввода сообщения в форме агента.")
         candidates.sort(
             key=lambda item: (
-                item.rectangle().top,
-                -item.rectangle().width(),
+                abs(item.rectangle().top - 170),
+                abs(item.rectangle().left - 270),
             )
         )
         return candidates[0]
+
+    def _set_text_to_input(self, control, text: str) -> None:
+        self._activate_main_window()
+        self._click(control)
+        hwnd = self._get_hwnd(control)
+        if hwnd:
+            self.logger.info(f"Пробуем native hwnd для поля ввода: {hwnd}")
+            if self._set_text_via_hwnd(hwnd, text) and self._read_input_value(control):
+                return
+        if self._set_text_via_rpa(control, text):
+            return
+        raise RuntimeError("Не удалось ввести текст в поле формы агента.")
+
+    def _read_input_value(self, control) -> str:
+        try:
+            iface_value = getattr(control, "iface_value", None)
+            if iface_value is not None:
+                value = iface_value.CurrentValue
+                if value is not None:
+                    return str(value).strip()
+        except Exception:
+            pass
+        return self._safe_text(control)
+
+    def _get_hwnd(self, control) -> int:
+        for attr in ("handle",):
+            try:
+                value = getattr(control, attr, None)
+                if isinstance(value, int) and value:
+                    return value
+            except Exception:
+                pass
+        try:
+            value = getattr(control.element_info, "handle", 0)
+            if isinstance(value, int) and value:
+                return value
+        except Exception:
+            pass
+        try:
+            rect = control.rectangle()
+            class POINT(ctypes.Structure):
+                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+            point = POINT(rect.left + max(1, rect.width() // 2), rect.top + max(1, rect.height() // 2))
+            value = ctypes.windll.user32.WindowFromPoint(point)
+            if isinstance(value, int) and value:
+                return value
+        except Exception:
+            pass
+        return 0
+
+    def _set_text_via_hwnd(self, hwnd: int, text: str) -> bool:
+        WM_SETTEXT = 0x000C
+        EM_SETSEL = 0x00B1
+        EM_REPLACESEL = 0x00C2
+        WM_CHAR = 0x0102
+        try:
+            user32 = ctypes.windll.user32
+            user32.SetForegroundWindow(self.main_window.handle)
+            user32.SendMessageW(hwnd, EM_SETSEL, 0, -1)
+            buffer = ctypes.create_unicode_buffer(text)
+            result = user32.SendMessageW(hwnd, WM_SETTEXT, 0, ctypes.cast(buffer, ctypes.c_wchar_p))
+            if result == 0:
+                user32.SendMessageW(hwnd, EM_SETSEL, -1, -1)
+                replace_buffer = ctypes.create_unicode_buffer(text)
+                user32.SendMessageW(hwnd, EM_REPLACESEL, 1, ctypes.cast(replace_buffer, ctypes.c_wchar_p))
+            if not self._safe_text_by_hwnd(hwnd):
+                for ch in text:
+                    user32.SendMessageW(hwnd, WM_CHAR, ord(ch), 0)
+            user32.SendMessageW(hwnd, 0x000F, 0, 0)
+            keyboard.send_keys("{TAB}", pause=0.05)
+            return True
+        except Exception:
+            return False
+
+    def _set_text_via_rpa(self, control, text: str) -> bool:
+        rect = control.rectangle()
+        anchor_points = [
+            (rect.left + 18, rect.top + 18),
+            (rect.left + max(30, rect.width() // 6), rect.top + max(18, rect.height() // 2)),
+            (rect.left + max(40, rect.width() // 3), rect.top + max(18, rect.height() // 2)),
+            (rect.left + max(50, rect.width() // 2), rect.top + max(18, rect.height() // 2)),
+        ]
+        for index, coords in enumerate(anchor_points, start=1):
+            try:
+                self.logger.info(f"RPA-ввод: попытка {index}, фокус в точку {coords}.")
+                self._activate_main_window()
+                self._click_at(coords)
+                time.sleep(0.2)
+                self._double_click_at(coords)
+                time.sleep(0.2)
+                self._drag_select_input_area(rect)
+                time.sleep(0.2)
+                self._paste_text_to_active_window(text)
+                time.sleep(0.4)
+                keyboard.send_keys("{TAB}", pause=0.05)
+                time.sleep(0.4)
+                if self._read_input_value(control):
+                    self.logger.info("RPA-ввод: поле вернуло непустое значение.")
+                    return True
+                full_text = self._window_dump_text(self.main_window).lower()
+                if text.lower() in full_text:
+                    self.logger.info("RPA-ввод: текст обнаружен в общем дампе окна.")
+                    return True
+            except Exception as exc:
+                self.logger.info(f"RPA-ввод: попытка {index} завершилась ошибкой: {exc}")
+        return False
+
+    def _activate_main_window(self) -> None:
+        try:
+            self.main_window.set_focus()
+        except Exception:
+            pass
+        try:
+            ctypes.windll.user32.SetForegroundWindow(self.main_window.handle)
+        except Exception:
+            pass
+        time.sleep(0.2)
+
+    def _click_at(self, coords: tuple[int, int]) -> None:
+        mouse.click(coords=coords)
+        time.sleep(0.2)
+
+    def _double_click_at(self, coords: tuple[int, int]) -> None:
+        mouse.double_click(coords=coords)
+        time.sleep(0.2)
+
+    def _drag_select_input_area(self, rect) -> None:
+        y = rect.top + max(18, rect.height() // 2)
+        start = (rect.left + max(20, rect.width() // 8), y)
+        end = (rect.right - max(20, rect.width() // 8), y)
+        self._mouse_drag(start, end)
+        keyboard.send_keys("^a", pause=0.05)
+        keyboard.send_keys("{BACKSPACE}", pause=0.05)
+
+    def _mouse_drag(self, start: tuple[int, int], end: tuple[int, int]) -> None:
+        self._set_cursor_pos(*start)
+        self._mouse_left_down()
+        time.sleep(0.1)
+        self._set_cursor_pos(*end)
+        time.sleep(0.1)
+        self._mouse_left_up()
+        time.sleep(0.2)
+
+    def _paste_text_to_active_window(self, text: str) -> None:
+        self._set_clipboard_text(text)
+        keyboard.send_keys("^v", pause=0.05)
+        time.sleep(0.1)
+        self._send_input_unicode_text(text)
+
+    def _set_clipboard_text(self, text: str) -> None:
+        GMEM_MOVEABLE = 0x0002
+        CF_UNICODETEXT = 13
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
+        kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = ctypes.c_void_p
+        kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalUnlock.restype = ctypes.c_int
+        kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalFree.restype = ctypes.c_void_p
+        user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+        user32.OpenClipboard.restype = ctypes.c_int
+        user32.EmptyClipboard.argtypes = []
+        user32.EmptyClipboard.restype = ctypes.c_int
+        user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+        user32.SetClipboardData.restype = ctypes.c_void_p
+        user32.CloseClipboard.argtypes = []
+        user32.CloseClipboard.restype = ctypes.c_int
+        data = (text + "\x00").encode("utf-16le")
+        handle = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
+        if not handle:
+            raise RuntimeError("Не удалось выделить память под буфер обмена.")
+        pointer = kernel32.GlobalLock(handle)
+        if not pointer:
+            kernel32.GlobalFree(handle)
+            raise RuntimeError("Не удалось заблокировать память под буфер обмена.")
+        ctypes.memmove(pointer, data, len(data))
+        kernel32.GlobalUnlock(handle)
+        if not user32.OpenClipboard(0):
+            kernel32.GlobalFree(handle)
+            raise RuntimeError("Не удалось открыть буфер обмена.")
+        try:
+            user32.EmptyClipboard()
+            if not user32.SetClipboardData(CF_UNICODETEXT, handle):
+                raise RuntimeError("Не удалось записать текст в буфер обмена.")
+            handle = None
+        finally:
+            user32.CloseClipboard()
+            if handle:
+                kernel32.GlobalFree(handle)
+
+    def _set_cursor_pos(self, x: int, y: int) -> None:
+        ctypes.windll.user32.SetCursorPos(x, y)
+
+    def _mouse_left_down(self) -> None:
+        ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)
+
+    def _mouse_left_up(self) -> None:
+        ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)
+
+    def _safe_text_by_hwnd(self, hwnd: int) -> str:
+        try:
+            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+            if length <= 0:
+                return ""
+            buf = ctypes.create_unicode_buffer(length + 1)
+            ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
+            return buf.value.strip()
+        except Exception:
+            return ""
+
+    def _send_input_unicode_text(self, text: str) -> None:
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [
+                ("wVk", ctypes.c_ushort),
+                ("wScan", ctypes.c_ushort),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+            ]
+
+        class _INPUTunion(ctypes.Union):
+            _fields_ = [("ki", KEYBDINPUT)]
+
+        class INPUT(ctypes.Structure):
+            _fields_ = [("type", ctypes.c_ulong), ("union", _INPUTunion)]
+
+        KEYEVENTF_UNICODE = 0x0004
+        KEYEVENTF_KEYUP = 0x0002
+        for ch in text:
+            extra = ctypes.c_ulong(0)
+            down = INPUT(1, _INPUTunion(ki=KEYBDINPUT(0, ord(ch), KEYEVENTF_UNICODE, 0, ctypes.pointer(extra))))
+            up = INPUT(1, _INPUTunion(ki=KEYBDINPUT(0, ord(ch), KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, ctypes.pointer(extra))))
+            ctypes.windll.user32.SendInput(1, ctypes.byref(down), ctypes.sizeof(INPUT))
+            ctypes.windll.user32.SendInput(1, ctypes.byref(up), ctypes.sizeof(INPUT))
 
     def _raise_if_error_dialog(self) -> None:
         for win in Desktop(backend=self.config.backend).windows():
@@ -400,8 +662,17 @@ class OneCAgentUiTest:
                 text = self._safe_text(item)
                 ctype = self._safe_control_type(item)
                 rect = item.rectangle()
+                hwnd = self._get_hwnd(item)
+                class_name = ""
+                try:
+                    if hwnd:
+                        class_buf = ctypes.create_unicode_buffer(256)
+                        ctypes.windll.user32.GetClassNameW(hwnd, class_buf, 255)
+                        class_name = class_buf.value
+                except Exception:
+                    class_name = ""
                 chunks.append(
-                    f"text={text!r} | type={ctype!r} | rect=({rect.left},{rect.top},{rect.right},{rect.bottom})"
+                    f"text={text!r} | type={ctype!r} | hwnd={hwnd!r} | class={class_name!r} | rect=({rect.left},{rect.top},{rect.right},{rect.bottom})"
                 )
             except Exception:
                 continue
@@ -455,23 +726,6 @@ class OneCAgentUiTest:
                 check=False,
                 timeout=15,
             )
-
-    @staticmethod
-    def _escape_for_send_keys(text: str) -> str:
-        for old, new in (
-            ("{", "{{}"),
-            ("}", "{}}"),
-            ("+", "{+}"),
-            ("^", "{^}"),
-            ("%", "{%}"),
-            ("~", "{~}"),
-            ("(", "{(}"),
-            (")", "{)}"),
-            ("[", "{[}"),
-            ("]", "{]}"),
-        ):
-            text = text.replace(old, new)
-        return text
 
     @staticmethod
     def _clear_proxy_env(env: dict[str, str]) -> None:
