@@ -67,9 +67,9 @@
 							<ContextMenu name="ОркестраторРаботаетКонтекстноеМеню" id="79"/>
 							<ExtendedTooltip name="ОркестраторРаботаетРасширеннаяПодсказка" id="80"/>
 						</LabelField>
-						<LabelField name="ЛогСсылка" id="130">
-							<DataPath>ЛогСсылка</DataPath>
-							<Title>
+							<LabelField name="ЛогСсылка" id="130">
+								<DataPath>ЛогСсылка</DataPath>
+								<Title>
 								<v8:item>
 									<v8:lang>ru</v8:lang>
 									<v8:content>Лог</v8:content>
@@ -79,12 +79,12 @@
 							<Hiperlink>true</Hiperlink>
 							<ContextMenu name="ЛогСсылкаКонтекстноеМеню" id="132"/>
 							<ExtendedTooltip name="ЛогСсылкаРасширеннаяПодсказка" id="131"/>
-							<Events>
-								<Event name="Click">ЛогСсылкаНажатие</Event>
-							</Events>
-						</LabelField>
-						<LabelField name="СтрокаСтатуса" id="4">
-							<DataPath>СтрокаСтатуса</DataPath>
+								<Events>
+									<Event name="Click">ЛогСсылкаНажатие</Event>
+								</Events>
+							</LabelField>
+							<LabelField name="СтрокаСтатуса" id="4">
+								<DataPath>СтрокаСтатуса</DataPath>
 							<Title>
 								<v8:item>
 									<v8:lang>ru</v8:lang>
@@ -409,8 +409,22 @@
 									<ExtendedTooltip name="ПланЗадачРезультатРасширеннаяПодсказка" id="115"/>
 								</InputField>
 							</ChildItems>
-						</Table>
-						<UsualGroup name="ГруппаСсылкиНаОбъекты" id="171">
+							</Table>
+							<LabelField name="СсылкаТабличногоДокумента" id="334">
+								<DataPath>СсылкаТабличногоДокумента</DataPath>
+								<Visible>false</Visible>
+								<TitleLocation>None</TitleLocation>
+								<Hiperlink>true</Hiperlink>
+								<Height>2</Height>
+								<AutoMaxHeight>false</AutoMaxHeight>
+								<HorizontalStretch>true</HorizontalStretch>
+								<ContextMenu name="СсылкаТабличногоДокументаКонтекстноеМеню" id="335"/>
+								<ExtendedTooltip name="СсылкаТабличногоДокументаРасширеннаяПодсказка" id="336"/>
+								<Events>
+									<Event name="Click">СсылкаТабличногоДокументаНажатие</Event>
+								</Events>
+							</LabelField>
+							<UsualGroup name="ГруппаСсылкиНаОбъекты" id="171">
 							<Title>
 								<v8:item>
 									<v8:lang/>
@@ -436,17 +450,6 @@
 									<ContextMenu name="ЗаголовокСсылкиНаОбъектыКонтекстноеМеню" id="174"/>
 									<ExtendedTooltip name="ЗаголовокСсылкиНаОбъектыРасширеннаяПодсказка" id="175"/>
 								</LabelDecoration>
-								<LabelField name="СсылкаТабличногоДокумента" id="334">
-									<DataPath>СсылкаТабличногоДокумента</DataPath>
-									<Visible>false</Visible>
-									<TitleLocation>None</TitleLocation>
-									<Hiperlink>true</Hiperlink>
-									<ContextMenu name="СсылкаТабличногоДокументаКонтекстноеМеню" id="335"/>
-									<ExtendedTooltip name="СсылкаТабличногоДокументаРасширеннаяПодсказка" id="336"/>
-									<Events>
-										<Event name="Click">СсылкаТабличногоДокументаНажатие</Event>
-									</Events>
-								</LabelField>
 							</ChildItems>
 						</UsualGroup>
 						<LabelDecoration name="ЗаголовокDecisionTimeline" id="320">
