@@ -68,6 +68,8 @@ class UiConfig:
     log_file: Optional[str]
     screenshot_dir: Optional[str]
     leave_open: bool
+    approval_action: str
+    require_approval: bool
 
 
 class Logger:
@@ -98,6 +100,7 @@ class OneCAgentUiTest:
         self.process: Optional[subprocess.Popen[str]] = None
         self.app: Optional[Application] = None
         self.main_window = None
+        self.approval_seen = False
 
     def run(self) -> int:
         try:
@@ -107,6 +110,8 @@ class OneCAgentUiTest:
             self._enter_prompt()
             self._send_prompt()
             self._wait_expected_response()
+            if self.config.require_approval and not self.approval_seen:
+                raise RuntimeError("Сценарий требовал ручного подтверждения, но pending approval в UI не появился.")
             self.logger.info("UI тест завершён успешно.")
             return 0
         except Exception as exc:
@@ -214,11 +219,21 @@ class OneCAgentUiTest:
         full_text = self._window_dump_text(self.main_window).lower()
         if "требуется подтверждение действия" not in full_text:
             return
+        self.approval_seen = True
         self.logger.info("Обнаружен pending approval, подтверждаем выполнение.")
-        for titles in (
-            ["Выполнять без подтверждения", "Execute without confirmation"],
-            ["Подтвердить", "Approve"],
-        ):
+        actions_map = {
+            "approve": [
+                ["Подтвердить", "Approve"],
+            ],
+            "without_confirmation": [
+                ["Выполнять без подтверждения", "Execute without confirmation"],
+            ],
+            "auto": [
+                ["Подтвердить", "Approve"],
+                ["Выполнять без подтверждения", "Execute without confirmation"],
+            ],
+        }
+        for titles in actions_map.get(self.config.approval_action, actions_map["auto"]):
             try:
                 button = self._find_descendant_by_titles(titles, ["Button"], 5)
                 self._click(button)
@@ -806,6 +821,17 @@ def parse_args() -> UiConfig:
         action="store_true",
         help="Не закрывать 1С после теста",
     )
+    parser.add_argument(
+        "--approval-action",
+        default="auto",
+        choices=["auto", "approve", "without_confirmation"],
+        help="Как обрабатывать pending approval в UI тесте",
+    )
+    parser.add_argument(
+        "--require-approval",
+        action="store_true",
+        help="Падать, если в UI не появилось ручное подтверждение",
+    )
     args = parser.parse_args()
     return UiConfig(
         platform_exe=args.platform_exe,
@@ -819,6 +845,8 @@ def parse_args() -> UiConfig:
         log_file=args.log_file,
         screenshot_dir=args.screenshot_dir,
         leave_open=args.leave_open,
+        approval_action=args.approval_action,
+        require_approval=args.require_approval,
     )
 
 

@@ -36,6 +36,8 @@ def build_job(args: argparse.Namespace, job_id: str, run_dir: Path) -> dict[str,
         "timeout_sec": args.timeout_sec,
         "startup_timeout_sec": args.startup_timeout_sec,
         "backend": args.backend,
+        "approval_action": args.approval_action,
+        "require_approval": args.require_approval,
         "leave_open": args.leave_open,
         "run_dir": str(run_dir),
         "log_file": str(run_dir / "ui_test.log"),
@@ -63,6 +65,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-sec", type=int, default=180)
     parser.add_argument("--startup-timeout-sec", type=int, default=120)
     parser.add_argument("--backend", default="uia", choices=["uia", "win32"])
+    parser.add_argument("--approval-action", default="auto", choices=["auto", "approve", "without_confirmation"])
+    parser.add_argument("--require-approval", action="store_true")
     parser.add_argument("--platform-exe", default=r"C:\Tools\1cv8\8.5.1.1150\bin\1cv8.exe")
     parser.add_argument("--base-path", default=r"\\DEV1\AIBase$")
     parser.add_argument("--user", default="Администратор")

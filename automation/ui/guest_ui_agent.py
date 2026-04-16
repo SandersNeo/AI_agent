@@ -122,11 +122,15 @@ class GuestUiAgent:
             str(job.get("startup_timeout_sec", 120)),
             "--backend",
             str(job.get("backend", "uia")),
+            "--approval-action",
+            str(job.get("approval_action", "auto")),
             "--log-file",
             str(log_file),
             "--screenshot-dir",
             str(screenshot_dir),
         ]
+        if job.get("require_approval"):
+            command.append("--require-approval")
         if job.get("leave_open"):
             command.append("--leave-open")
 
