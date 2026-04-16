@@ -37,6 +37,8 @@ __pycache__/
 # Тестовые конфигурации
 КонфигурацияТест/
 automation/vanessa/logs/
+automation/tau/logs/
+automation/com_1c/logs/
 
 # Логи сборки и запуска
 automation/logs/
