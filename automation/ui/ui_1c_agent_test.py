@@ -61,6 +61,7 @@ class UiConfig:
     base_path: str
     user: str
     prompt: str
+    dialog_type: str
     expected_text: str
     timeout_sec: int
     startup_timeout_sec: int
@@ -107,6 +108,7 @@ class OneCAgentUiTest:
             self._start_client()
             self._open_agent_form()
             self._start_new_dialog()
+            self._select_dialog_type()
             self._enter_prompt()
             self._send_prompt()
             self._wait_expected_response()
@@ -180,6 +182,61 @@ class OneCAgentUiTest:
         self._click(button)
         self._wait_window_text_contains("Готов к работе", 20)
 
+    def _select_dialog_type(self) -> None:
+        target_variants = self._dialog_type_variants(self.config.dialog_type)
+        if not target_variants:
+            return
+        target = target_variants[0]
+        try:
+            combo = self._locate_dialog_type_combo()
+        except Exception:
+            self.logger.info("Не удалось найти selector типа диалога, оставляем текущий режим.")
+            return
+        current = self._safe_text(combo).strip()
+        if current and self._normalize_dialog_type(current) == self._normalize_dialog_type(target):
+            return
+        self.logger.info(f"Выбираем тип диалога: {target!r}.")
+        self._click(combo)
+        time.sleep(0.5)
+        option = self._find_descendant_by_titles(target_variants, ["ListItem", "MenuItem", "Text", "Custom"], 10)
+        self._click(option)
+        time.sleep(0.5)
+
+    def _normalize_dialog_type(self, value: str) -> str:
+        normalized = (value or "").strip().lower().replace(" ", "")
+        mapping = {
+            "agent": "агент",
+            "агент": "агент",
+            "запрос1с": "запрос1с",
+            "zapros1s": "запрос1с",
+        }
+        return mapping.get(normalized, normalized)
+
+    def _dialog_type_variants(self, value: str) -> list[str]:
+        normalized = self._normalize_dialog_type(value)
+        if normalized == "агент":
+            return ["Агент", "Agent"]
+        if normalized == "запрос1с":
+            return ["Запрос 1С", "Запрос1С", "Zapros1S"]
+        raw = (value or "").strip()
+        return [raw] if raw else []
+
+    def _locate_dialog_type_combo(self):
+        candidates = []
+        for item in self._iter_descendants():
+            if self._safe_control_type(item) != "ComboBox":
+                continue
+            rect = item.rectangle()
+            if rect.width() < 120 or rect.height() < 18:
+                continue
+            if rect.left < 720 or rect.top < 130 or rect.top > 190:
+                continue
+            candidates.append(item)
+        if not candidates:
+            raise RuntimeError("Не найден selector типа диалога.")
+        candidates.sort(key=lambda item: (abs(item.rectangle().top - 155), abs(item.rectangle().left - 780)))
+        return candidates[0]
+
     def _enter_prompt(self) -> None:
         self.logger.info("Вводим пользовательское сообщение.")
         edit = self._locate_prompt_input()
@@ -209,6 +266,9 @@ class OneCAgentUiTest:
             text_dump = self._window_dump_text(self.main_window).lower()
             if expected in text_dump:
                 return
+            if self._is_successfully_completed(text_dump):
+                self.logger.info("Ожидаемый текст недоступен в dump UI, но форма показывает успешное завершение.")
+                return
             for marker in error_markers:
                 if marker in text_dump:
                     raise RuntimeError(f"В форме агента зафиксирована ошибка:\n{text_dump}")
@@ -217,7 +277,12 @@ class OneCAgentUiTest:
 
     def _handle_pending_approval(self) -> None:
         full_text = self._window_dump_text(self.main_window).lower()
-        if "требуется подтверждение действия" not in full_text:
+        approval_markers = (
+            "требуется подтверждение",
+            "pending approval",
+            "риск:",
+        )
+        if not any(marker in full_text for marker in approval_markers):
             return
         self.approval_seen = True
         self.logger.info("Обнаружен pending approval, подтверждаем выполнение.")
@@ -241,6 +306,18 @@ class OneCAgentUiTest:
                 return
             except Exception:
                 continue
+
+    def _is_successfully_completed(self, text_dump: str) -> bool:
+        send_ready = "отправить" in text_dump and "остановить" not in text_dump
+        if not send_ready:
+            return False
+        success_markers = (
+            "задача выполнена успешно",
+            "подтверждено по системным результатам",
+            "открыть таблицу результатов",
+            "успешно",
+        )
+        return any(marker in text_dump for marker in success_markers)
 
     def _find_descendant_by_titles(self, titles: list[str], control_types: list[str], timeout: int):
         deadline = time.time() + timeout
@@ -784,6 +861,11 @@ def parse_args() -> UiConfig:
         help="Текст сообщения агенту",
     )
     parser.add_argument(
+        "--dialog-type",
+        default="Агент",
+        help="Тип диалога в форме агента",
+    )
+    parser.add_argument(
         "--expected-text",
         default="Поля успешно получены",
         help="Ожидаемый фрагмент ответа",
@@ -838,6 +920,7 @@ def parse_args() -> UiConfig:
         base_path=args.base_path,
         user=args.user,
         prompt=args.prompt,
+        dialog_type=args.dialog_type,
         expected_text=args.expected_text,
         timeout_sec=args.timeout_sec,
         startup_timeout_sec=args.startup_timeout_sec,

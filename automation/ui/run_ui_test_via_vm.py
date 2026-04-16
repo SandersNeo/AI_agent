@@ -32,6 +32,7 @@ def build_job(args: argparse.Namespace, job_id: str, run_dir: Path) -> dict[str,
         "base_path": args.base_path,
         "user": args.user,
         "prompt": args.prompt,
+        "dialog_type": args.dialog_type,
         "expected_text": args.expected_text,
         "timeout_sec": args.timeout_sec,
         "startup_timeout_sec": args.startup_timeout_sec,
@@ -70,6 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--platform-exe", default=r"C:\Tools\1cv8\8.5.1.1150\bin\1cv8.exe")
     parser.add_argument("--base-path", default=r"\\DEV1\AIBase$")
     parser.add_argument("--user", default="Администратор")
+    parser.add_argument("--dialog-type", default="Агент")
     parser.add_argument("--leave-open", action="store_true")
     parser.add_argument("--wait-timeout-sec", type=int, default=600)
     parser.add_argument("--host-jobs-root", default=str(DEFAULT_HOST_JOBS_ROOT))

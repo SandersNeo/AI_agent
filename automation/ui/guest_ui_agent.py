@@ -112,6 +112,8 @@ class GuestUiAgent:
             str(job["base_path"]),
             "--user",
             str(job["user"]),
+            "--dialog-type",
+            str(job.get("dialog_type", "Агент")),
             "--prompt",
             str(job["prompt"]),
             "--expected-text",
