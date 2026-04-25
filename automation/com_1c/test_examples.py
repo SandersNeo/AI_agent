@@ -9,6 +9,7 @@
 Запуск (из каталога automation):
     python test_examples.py
     python test_examples.py --connection "File=\"D:\\base\";"
+    python test_examples.py --connection "Srvr=\"127.0.0.1\";Ref=\"erp_mark\";Usr=\"Администратор\";Pwd=\"\";"
     python test_examples.py --log-dir ./logs --verbose
 
 Секреты Telegram в .env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID

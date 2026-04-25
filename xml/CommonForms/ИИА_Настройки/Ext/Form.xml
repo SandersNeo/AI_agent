@@ -119,6 +119,9 @@
 					</Title>
 					<ContextMenu name="Provider_BaseUrlКонтекстноеМеню" id="18"/>
 					<ExtendedTooltip name="Provider_BaseUrlРасширеннаяПодсказка" id="19"/>
+					<Events>
+						<Event name="OnChange">Provider_BaseUrlПриИзменении</Event>
+					</Events>
 				</InputField>
 				<InputField name="Provider_ApiKey" id="1">
 					<DataPath>Provider_ApiKey</DataPath>

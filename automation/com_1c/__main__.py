@@ -4,6 +4,7 @@ r"""
 
 Примеры:
     python -m com_1c --connection "File=\"D:\base\";" --query "ВЫБРАТЬ 1 КАК Х"
+    python -m com_1c --connection "Srvr=\"127.0.0.1\";Ref=\"erp_mark\";Usr=\"Администратор\";Pwd=\"\";" -q "ВЫБРАТЬ 1 КАК Х" --columns Номер
     python -m com_1c --query "ВЫБРАТЬ ПЕРВЫЕ 5 Ссылка, Наименование ИЗ Справочник.Контрагенты"
     set 1C_CONNECTION_STRING=File="D:\EDT_base\КонфигурацияТест"
     python -m com_1c --query "ВЫБРАТЬ 1 КАК Номер" --columns Номер

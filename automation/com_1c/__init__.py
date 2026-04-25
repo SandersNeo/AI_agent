@@ -6,6 +6,7 @@
     from com_1c import connect_to_1c, execute_query
 
     conn = connect_to_1c('File="C:\\path\\to\\base";')
+    # или сервер: connect_to_1c('Srvr="srv";Ref="ib";Usr="";Pwd="";')
     rows = execute_query(conn, "ВЫБРАТЬ 1 КАК Номер", ["Номер"])
 """
 

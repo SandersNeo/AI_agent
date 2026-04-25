@@ -394,6 +394,50 @@
 	
 КонецФункции
 
+Функция ЭтоЛокальныйLLMProvider(BaseUrl) Экспорт
+	URL = НРег(СокрЛП(Строка(BaseUrl)));
+	Возврат Лев(URL, 7) = "http://";
+КонецФункции
+
+Функция Локальные_СписокМоделей() Экспорт
+	Модели = Новый Массив;
+	
+	// Qwen
+	Модели.Добавить(Новый Структура("id, name", "qwen3-8b", "Qwen 3 8B"));
+	Модели.Добавить(Новый Структура("id, name", "qwen3-14b", "Qwen 3 14B"));
+	Модели.Добавить(Новый Структура("id, name", "qwen2.5-7b-instruct", "Qwen 2.5 7B Instruct"));
+	Модели.Добавить(Новый Структура("id, name", "qwen2.5-14b-instruct", "Qwen 2.5 14B Instruct"));
+	Модели.Добавить(Новый Структура("id, name", "qwen2.5-coder-7b-instruct", "Qwen 2.5 Coder 7B Instruct"));
+	Модели.Добавить(Новый Структура("id, name", "qwen2.5-coder-14b-instruct", "Qwen 2.5 Coder 14B Instruct"));
+	
+	// Llama
+	Модели.Добавить(Новый Структура("id, name", "llama-3.1-8b-instruct", "Llama 3.1 8B Instruct"));
+	Модели.Добавить(Новый Структура("id, name", "llama-3.1-70b-instruct", "Llama 3.1 70B Instruct"));
+	Модели.Добавить(Новый Структура("id, name", "llama-3.2-3b-instruct", "Llama 3.2 3B Instruct"));
+	
+	// DeepSeek
+	Модели.Добавить(Новый Структура("id, name", "deepseek-r1-distill-qwen-7b", "DeepSeek R1 Distill Qwen 7B"));
+	Модели.Добавить(Новый Структура("id, name", "deepseek-r1-distill-llama-8b", "DeepSeek R1 Distill Llama 8B"));
+	Модели.Добавить(Новый Структура("id, name", "deepseek-v3", "DeepSeek V3"));
+	
+	// Mistral / Mixtral
+	Модели.Добавить(Новый Структура("id, name", "mistral-7b-instruct", "Mistral 7B Instruct"));
+	Модели.Добавить(Новый Структура("id, name", "mixtral-8x7b-instruct", "Mixtral 8x7B Instruct"));
+	
+	// Gemma / Phi
+	Модели.Добавить(Новый Структура("id, name", "gemma-3-12b-it", "Gemma 3 12B IT"));
+	Модели.Добавить(Новый Структура("id, name", "phi-4", "Phi 4"));
+	
+	Возврат Модели;
+КонецФункции
+
+Функция ПолучитьСписокМоделейДляПровайдера(BaseUrl) Экспорт
+	Если ЭтоЛокальныйLLMProvider(BaseUrl) Тогда
+		Возврат Локальные_СписокМоделей();
+	КонецЕсли;
+	Возврат Gitsell_СписокМоделей();
+КонецФункции
+
 #КонецОбласти
 
 #Область GitHub_Updater

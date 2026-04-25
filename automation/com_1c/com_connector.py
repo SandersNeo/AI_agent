@@ -3,8 +3,12 @@
 Модуль для работы с базой данных 1С через COM.
 
 Содержит:
-- выбор и инициализация COM-коннектора (V83.COMConnector / V82.COMConnector);
-- построение строки подключения;
+- выбор COM-коннектора (**V83** → **V85** → **V82**): для сервера 8.3 клиент 8.5 по COM
+  даёт несовместимость версий, поэтому сначала пробуем 8.3;
+- строка подключения: **файловая** ``File="…";`` или **серверная**
+  ``Srvr="…";Ref="…";Usr="…";Pwd="…";`` (целиком в ``1C_CONNECTION_STRING``);
+- для **V83**, если у ``Dispatch`` нет метода ``Connect``, подключение через **typelib**
+  ``comcntr.dll`` + ``dynamic.Dispatch(..., typeinfo=…)``;
 - выполнение запросов и безопасная работа с COM-объектами.
 
 Важно:
@@ -16,6 +20,7 @@
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Iterable, Optional, Sequence, Tuple
 
 
@@ -44,10 +49,13 @@ except ImportError:
     win32com = None  # type: ignore
 
 DEFAULT_COM_PROGIDS: Tuple[str, ...] = (
-    "V85.COMConnector",  # платформа 8.5
-    "V83.COMConnector",  # платформа 8.3
-    "V82.COMConnector",  # платформа 8.2
+    "V83.COMConnector",
+    "V85.COMConnector",
+    "V82.COMConnector",
 )
+
+_COMCNTR_TLB_GUID = "{98AC3B5B-5323-418F-8F07-E32F231D2393}"
+_IID_IV8_COM_CONNECTOR3 = "{2FF2245E-C604-45BD-AC16-19B1F64BD9A4}"
 
 _verbose = False
 
@@ -271,19 +279,73 @@ def _apply_short_path_for_unicode(connection_string: str) -> str:
     return connection_string
 
 
+def _platform_83_exe() -> str:
+    """Путь к 1cv8.exe 8.3 (для поиска comcntr.dll рядом)."""
+    try:
+        from com_1c.config import get_platform_83
+
+        return get_platform_83()
+    except Exception:
+        return os.environ.get(
+            "PLATFORM_83", r"C:\Program Files\1cv8\8.3.27.1859\bin\1cv8.exe"
+        )
+
+
+def _connect_v83_via_typelib(connection_string: str):
+    """
+    Подключение через IV8COMConnector3 + ITypeInfo (если у V83.COMConnector нет Connect в Dispatch).
+    """
+    import pythoncom
+    import pywintypes
+    import win32com.client.dynamic as win32_dynamic
+    import win32com.client.gencache as gencache
+
+    mod = None
+    try:
+        mod = gencache.EnsureModule(_COMCNTR_TLB_GUID, 0, 1, 0)
+    except Exception:
+        dll = Path(_platform_83_exe()).resolve().parent / "comcntr.dll"
+        if dll.is_file():
+            mod = gencache.EnsureModule(str(dll), 0, 1, 0)
+    if mod is None:
+        raise RuntimeError("Не удалось загрузить typelib comcntr (EnsureModule)")
+
+    dll_path = Path(_platform_83_exe()).resolve().parent / "comcntr.dll"
+    if not dll_path.is_file():
+        raise RuntimeError(f"Не найден comcntr.dll: {dll_path}")
+
+    tlib = pythoncom.LoadTypeLib(str(dll_path))
+    ti = tlib.GetTypeInfoOfGuid(pywintypes.IID(_IID_IV8_COM_CONNECTOR3))
+    raw = pythoncom.new(mod.COMConnector.CLSID)
+    connector = win32_dynamic.Dispatch(raw, typeinfo=ti)
+    return connector.Connect(connection_string)
+
+
 def resolve_connection_string(db_path_or_config: str) -> Tuple[str, str]:
     """
     Определяет строку подключения к базе 1С.
-    Возвращает кортеж (connection_string, human_readable_name).
+
+    Поддерживается:
+    - серверная строка (если есть ``Srvr=`` или ``Ref=``) — возвращается как есть
+      (после обрезки пробелов и добавления ``;`` в конце при необходимости);
+    - готовая файловая ``File="…";…``;
+    - только путь к каталогу файловой базы — оборачивается в ``File="…";Usr=;Pwd=;``.
     """
-    if "Srvr=" in db_path_or_config or "Ref=" in db_path_or_config:
-        return db_path_or_config, "Строка подключения (сервер)"
-    if 'File="' in db_path_or_config and ";" in db_path_or_config.split("File=", 1)[-1]:
-        connection_string = db_path_or_config
+    raw = (db_path_or_config or "").strip()
+    if not raw:
+        raise ValueError("Пустая строка подключения")
+
+    if "Srvr=" in raw or "Ref=" in raw:
+        if not raw.endswith(";"):
+            raw = raw + ";"
+        return raw, "Серверная база (Srvr/Ref)"
+
+    if 'File="' in raw and ";" in raw.split("File=", 1)[-1]:
+        connection_string = raw
     else:
-        connection_string = f'File="{db_path_or_config}";Usr=;Pwd=;'
+        connection_string = f'File="{raw}";Usr=;Pwd=;'
     connection_string = _apply_short_path_for_unicode(connection_string)
-    return connection_string, f"Файловая база: {db_path_or_config}"
+    return connection_string, f"Файловая база: {raw}"
 
 
 def connect_to_1c(db_path_or_config: str):
@@ -291,7 +353,8 @@ def connect_to_1c(db_path_or_config: str):
     Подключается к базе данных 1С через COM.
 
     Args:
-        db_path_or_config: строка подключения или путь к файловой базе.
+        db_path_or_config: путь к файловой базе, либо полная строка с ``File=…;``,
+            либо серверная ``Srvr="хост";Ref="имяИБ";Usr="…";Pwd="…";`` (как в консоли кластера).
 
     Returns:
         COM-объект соединения или None при ошибке.
@@ -312,7 +375,15 @@ def connect_to_1c(db_path_or_config: str):
             continue
         connect_method = safe_getattr(connector, "Connect", None)
         if not callable(connect_method):
-            errors.append((progid, "Connect method not available"))
+            if progid == "V83.COMConnector":
+                try:
+                    com_object = _connect_v83_via_typelib(connection_string)
+                    _log("Подключение успешно через V83 (typelib IV8COMConnector3).")
+                    return com_object
+                except Exception as exc:
+                    errors.append((progid, f"V83 typelib: {exc}"))
+            else:
+                errors.append((progid, "Connect method not available"))
             continue
         try:
             com_object = connect_method(connection_string)
@@ -327,7 +398,11 @@ def connect_to_1c(db_path_or_config: str):
             print(f"Ошибка подключения к базе ({progid}): {exc}")
     else:
         print("Ошибка: не удалось создать COM-коннектор.")
-    print("Возможные причины: база занята (закройте 1С:Предприятие), неверный путь, нет прав или отсутствует лицензия 1С.")
+    print(
+        "Возможные причины: ragent/кластер недоступен, неверная строка Srvr/Ref, "
+        "несовпадение версии клиента COM и сервера (используйте V83 к серверу 8.3), "
+        "база занята, нет прав или лицензии 1С."
+    )
     return None
 
 
