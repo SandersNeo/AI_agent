@@ -14,7 +14,9 @@ Desktop UI тест формы ИИ агента без Vanessa и без COM.
 from __future__ import annotations
 
 import argparse
+import csv
 import ctypes
+import importlib.util
 import os
 import subprocess
 import sys
@@ -22,6 +24,33 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+AUTOMATION_ROOT = REPO_ROOT / "automation"
+HOST_PREPARED_QUERY1C_MARKER = "__HOST_PREPARED_QUERY1C__"
+for _path in (REPO_ROOT, AUTOMATION_ROOT):
+    _path_str = str(_path)
+    if _path_str not in sys.path:
+        sys.path.insert(0, _path_str)
+
+try:
+    from com_1c import call_procedure, connect_to_1c, get_enum_value
+except ModuleNotFoundError:
+    _com_package_root = AUTOMATION_ROOT / "com_1c"
+    _com_init = _com_package_root / "__init__.py"
+    _spec = importlib.util.spec_from_file_location(
+        "com_1c",
+        _com_init,
+        submodule_search_locations=[str(_com_package_root)],
+    )
+    if _spec is None or _spec.loader is None:
+        raise
+    _module = importlib.util.module_from_spec(_spec)
+    sys.modules["com_1c"] = _module
+    _spec.loader.exec_module(_module)
+    call_procedure = _module.call_procedure
+    connect_to_1c = _module.connect_to_1c
+    get_enum_value = _module.get_enum_value
 
 
 def setup_console_encoding() -> None:
@@ -60,6 +89,7 @@ class UiConfig:
     platform_exe: str
     base_path: str
     user: str
+    password: str
     prompt: str
     dialog_type: str
     expected_text: str
@@ -71,6 +101,13 @@ class UiConfig:
     leave_open: bool
     approval_action: str
     require_approval: bool
+    test_case: str
+    query_text: str
+    query_params_json: str
+    web_url: str
+    chrome_exe: str
+    headed: bool
+    skip_com_prepare: bool
 
 
 class Logger:
@@ -102,16 +139,25 @@ class OneCAgentUiTest:
         self.app: Optional[Application] = None
         self.main_window = None
         self.approval_seen = False
+        self.com_connection = None
+        self.prepared_dialog_ref = None
+        self.client_pids: list[int] = []
 
     def run(self) -> int:
         try:
+            skip_com_prepare = self.config.skip_com_prepare or HOST_PREPARED_QUERY1C_MARKER in self.config.prompt
+            if self.config.test_case == "query1c_form" and not skip_com_prepare:
+                self._prepare_query1c_dialog_via_com()
             self._start_client()
             self._open_agent_form()
-            self._start_new_dialog()
-            self._select_dialog_type()
-            self._enter_prompt()
-            self._send_prompt()
-            self._wait_expected_response()
+            if self.config.test_case == "query1c_form":
+                self._run_query1c_form_scenario()
+            else:
+                self._start_new_dialog()
+                self._select_dialog_type()
+                self._enter_prompt()
+                self._send_prompt()
+                self._wait_expected_response()
             if self.config.require_approval and not self.approval_seen:
                 raise RuntimeError("Сценарий требовал ручного подтверждения, но pending approval в UI не появился.")
             self.logger.info("UI тест завершён успешно.")
@@ -127,6 +173,8 @@ class OneCAgentUiTest:
     def _start_client(self) -> None:
         client_env = os.environ.copy()
         self._clear_proxy_env(client_env)
+        image_name = Path(self.config.platform_exe).name
+        before_pids = set(self._list_process_ids(image_name))
         cmd = [
             self.config.platform_exe,
             "ENTERPRISE",
@@ -139,25 +187,88 @@ class OneCAgentUiTest:
         ]
         self.logger.info("Запуск клиента 1С.")
         self.process = subprocess.Popen(cmd, env=client_env)
+        self.client_pids = self._wait_for_client_processes(image_name, before_pids)
+        self.main_window = self._wait_for_top_window(self.client_pids)
         self.app = Application(backend=self.config.backend).connect(
-            process=self.process.pid,
+            process=self.main_window.process_id(),
             timeout=self.config.startup_timeout_sec,
         )
-        self.main_window = self._wait_for_top_window()
         self.main_window.set_focus()
         self.logger.info(f"Подключились к окну: {self.main_window.window_text()!r}")
 
-    def _wait_for_top_window(self):
+    def _wait_for_client_processes(self, image_name: str, before_pids: set[int]) -> list[int]:
         deadline = time.time() + self.config.startup_timeout_sec
         while time.time() < deadline:
-            windows = self.app.windows() if self.app else []
-            visible = [w for w in windows if self._safe_is_visible(w)]
+            current_pids = self._list_process_ids(image_name)
+            new_pids = [pid for pid in current_pids if pid not in before_pids]
+            if new_pids:
+                self.logger.info(f"Новые процессы клиента: {new_pids}")
+                return new_pids
+            if self.process and self.process.poll() is not None:
+                return [self.process.pid]
+            time.sleep(1)
+        return [self.process.pid] if self.process else []
+
+    def _wait_for_top_window(self, process_ids: list[int]):
+        deadline = time.time() + self.config.startup_timeout_sec
+        while time.time() < deadline:
+            visible = []
+            for win in Desktop(backend=self.config.backend).windows():
+                try:
+                    if process_ids and win.process_id() not in process_ids:
+                        continue
+                    if self._safe_is_visible(win):
+                        visible.append(win)
+                except Exception:
+                    continue
             if visible:
                 visible.sort(key=lambda w: len(self._safe_text(w)), reverse=True)
                 return visible[0]
             self._raise_if_error_dialog()
             time.sleep(1)
+        self.logger.info(f"Окна процессов клиента перед падением: {self._collect_process_windows(process_ids)}")
         raise RuntimeError("Не удалось дождаться главного окна 1С.")
+
+    def _list_process_ids(self, image_name: str) -> list[int]:
+        try:
+            output = subprocess.check_output(
+                ["tasklist", "/FO", "CSV", "/NH", "/FI", f"IMAGENAME eq {image_name}"],
+                text=True,
+                encoding="cp866",
+                errors="replace",
+            )
+        except Exception:
+            return []
+        process_ids: list[int] = []
+        for row in csv.reader(output.splitlines()):
+            if len(row) < 2:
+                continue
+            if row[0].strip('"').lower() != image_name.lower():
+                continue
+            try:
+                process_ids.append(int(row[1].strip('"')))
+            except ValueError:
+                continue
+        return process_ids
+
+    def _collect_process_windows(self, process_ids: list[int]) -> list[dict[str, object]]:
+        windows_info: list[dict[str, object]] = []
+        for win in Desktop(backend=self.config.backend).windows():
+            try:
+                pid = win.process_id()
+                if process_ids and pid not in process_ids:
+                    continue
+                windows_info.append(
+                    {
+                        "pid": pid,
+                        "title": win.window_text(),
+                        "visible": self._safe_is_visible(win),
+                        "class_name": win.class_name(),
+                    }
+                )
+            except Exception:
+                continue
+        return windows_info
 
     def _open_agent_form(self) -> None:
         self.logger.info("Открываем раздел 'ИИ Агент'.")
@@ -196,11 +307,24 @@ class OneCAgentUiTest:
         if current and self._normalize_dialog_type(current) == self._normalize_dialog_type(target):
             return
         self.logger.info(f"Выбираем тип диалога: {target!r}.")
+        if self._try_select_dialog_type_via_wrapper(combo, target):
+            return
         self._click(combo)
         time.sleep(0.5)
-        option = self._find_descendant_by_titles(target_variants, ["ListItem", "MenuItem", "Text", "Custom"], 10)
-        self._click(option)
-        time.sleep(0.5)
+        try:
+            option = self._find_descendant_by_titles(target_variants, ["ListItem", "MenuItem", "Text", "Custom"], 10)
+            self._click(option)
+            time.sleep(0.7)
+        except Exception:
+            self.logger.info("Не нашли popup-элемент типа диалога, пробуем клавиатурный fallback.")
+        if self._dialog_type_is_active(target):
+            return
+        self._click(combo)
+        time.sleep(0.3)
+        self._try_select_dialog_type_via_keyboard(target)
+        time.sleep(0.7)
+        if not self._dialog_type_is_active(target):
+            raise RuntimeError(f"Не удалось переключить тип диалога на {target!r}.")
 
     def _normalize_dialog_type(self, value: str) -> str:
         normalized = (value or "").strip().lower().replace(" ", "")
@@ -236,6 +360,50 @@ class OneCAgentUiTest:
             raise RuntimeError("Не найден selector типа диалога.")
         candidates.sort(key=lambda item: (abs(item.rectangle().top - 155), abs(item.rectangle().left - 780)))
         return candidates[0]
+
+    def _try_select_dialog_type_via_wrapper(self, combo, target: str) -> bool:
+        for method_name in ("select", "select_item"):
+            method = getattr(combo, method_name, None)
+            if method is None:
+                continue
+            try:
+                method(target)
+                time.sleep(0.7)
+                if self._dialog_type_is_active(target):
+                    return True
+            except Exception:
+                continue
+        expand = getattr(combo, "expand", None)
+        if expand is not None:
+            try:
+                expand()
+                time.sleep(0.3)
+            except Exception:
+                pass
+        return False
+
+    def _try_select_dialog_type_via_keyboard(self, target: str) -> None:
+        normalized = self._normalize_dialog_type(target)
+        if normalized == "запрос1с":
+            keyboard.send_keys("{DOWN}{ENTER}", pause=0.05)
+            return
+        keyboard.send_keys("{HOME}{ENTER}", pause=0.05)
+
+    def _dialog_type_is_active(self, target: str) -> bool:
+        normalized = self._normalize_dialog_type(target)
+        try:
+            current = self._normalize_dialog_type(self._safe_text(self._locate_dialog_type_combo()))
+            if current == normalized and current:
+                return True
+        except Exception:
+            pass
+        if normalized == "запрос1с":
+            text_dump = self._window_dump_text(self.main_window)
+            if "Открыть форму запроса 1С" in text_dump:
+                return True
+            if "Диалог ИИ" in text_dump and "Запрос 1С" in text_dump:
+                return True
+        return False
 
     def _enter_prompt(self) -> None:
         self.logger.info("Вводим пользовательское сообщение.")
@@ -274,6 +442,169 @@ class OneCAgentUiTest:
                     raise RuntimeError(f"В форме агента зафиксирована ошибка:\n{text_dump}")
             time.sleep(2)
         raise RuntimeError(f"Не дождались ожидаемого текста ответа: {self.config.expected_text!r}")
+
+    def _run_query1c_form_scenario(self) -> None:
+        self.logger.info("Запускаем UI-сценарий формы 'Запрос 1С'.")
+        self._wait_window_text_contains("Открыть форму запроса 1С", 30)
+        link = self._find_descendant_by_titles(
+            ["Открыть форму запроса 1С"],
+            ["Hyperlink", "Text", "Button"],
+            20,
+        )
+        self._click(link)
+        query_window = self._wait_for_process_window(["Запрос 1С", "Запрос1С"], 20)
+        self.logger.info(f"Открыта форма запроса: {query_window.window_text()!r}")
+
+        query_edit = self._locate_query_form_edit(query_window, 0)
+        self._set_text_to_input_in_window(query_window, query_edit, self.config.query_text)
+        self._wait_window_dump_contains(
+            query_window,
+            "Агент будет использовать эту версию",
+            20,
+        )
+
+        execute_button = self._find_descendant_by_titles_in_window(
+            query_window,
+            ["Выполнить", "Execute"],
+            ["Button"],
+            20,
+        )
+        self._click(execute_button)
+        self._wait_window_dump_contains(query_window, "Запрос выполнен.", self.config.timeout_sec)
+        self._wait_window_dump_contains(query_window, self.config.expected_text, self.config.timeout_sec)
+
+    def _prepare_query1c_dialog_via_com(self) -> None:
+        connection_string = f'File="{self.config.base_path}";Usr="{self.config.user}";Pwd="";'
+        self.logger.info("Подготавливаем диалог 'Запрос 1С' через COM до открытия UI.")
+        self.com_connection = connect_to_1c(connection_string)
+        if not self.com_connection:
+            raise RuntimeError("Не удалось установить COM-подключение к 1С для подготовки диалога Запрос1С.")
+        dialog_type = get_enum_value(self.com_connection, "ИИА_ТипДиалога", "Запрос1С")
+        if dialog_type is None:
+            raise RuntimeError("Не найдено перечисление ИИА_ТипДиалога.Запрос1С.")
+        self.prepared_dialog_ref = call_procedure(
+            self.com_connection,
+            "ИИА_Сервер",
+            "СоздатьНовыйДиалог",
+            self.config.user,
+            dialog_type,
+        )
+        if self.prepared_dialog_ref is None:
+            raise RuntimeError("COM не вернул ссылку на подготовленный диалог Запрос1С.")
+        call_procedure(
+            self.com_connection,
+            "ИИА_Сервер",
+            "СохранитьЧерновикЗапроса1С",
+            self.prepared_dialog_ref,
+            self.config.query_text,
+            "",
+        )
+        self.logger.info("Диалог 'Запрос 1С' подготовлен и сохранён как последний диалог пользователя.")
+
+    def _wait_for_process_window(self, title_variants: list[str], timeout: int):
+        deadline = time.time() + timeout
+        wanted = [title.lower() for title in title_variants]
+        while time.time() < deadline:
+            self._raise_if_error_dialog()
+            for win in Desktop(backend=self.config.backend).windows():
+                try:
+                    if self.process is not None and win.process_id() != self.process.pid:
+                        continue
+                    if not self._safe_is_visible(win):
+                        continue
+                    title = self._safe_text(win).lower()
+                    if any(needle in title for needle in wanted):
+                        return win
+                except Exception:
+                    continue
+            time.sleep(1)
+        raise RuntimeError(f"Не удалось дождаться окна: {title_variants!r}")
+
+    def _locate_query_form_edit(self, window, index: int):
+        candidates = []
+        for item in self._iter_descendants(window):
+            if self._safe_control_type(item) != "Edit":
+                continue
+            rect = item.rectangle()
+            if rect.width() < 250 or rect.height() < 40:
+                continue
+            candidates.append(item)
+        if not candidates:
+            raise RuntimeError("Не найдены поля формы 'Запрос 1С'.")
+        candidates.sort(key=lambda item: (item.rectangle().top, item.rectangle().left))
+        if index >= len(candidates):
+            raise RuntimeError(f"В форме 'Запрос 1С' найдено только {len(candidates)} полей Edit.")
+        return candidates[index]
+
+    def _set_text_to_input_in_window(self, window, control, text: str) -> None:
+        self._activate_window(window)
+        self._click(control)
+        hwnd = self._get_hwnd(control)
+        if hwnd:
+            self.logger.info(f"Пробуем native hwnd для поля окна запроса: {hwnd}")
+            if self._set_text_via_hwnd(hwnd, text):
+                time.sleep(0.5)
+                if self._read_input_value(control):
+                    return
+        if self._set_text_via_rpa_in_window(window, control, text):
+            return
+        raise RuntimeError("Не удалось ввести текст в поле формы 'Запрос 1С'.")
+
+    def _set_text_via_rpa_in_window(self, window, control, text: str) -> bool:
+        rect = control.rectangle()
+        coords = (rect.left + max(20, rect.width() // 4), rect.top + max(18, rect.height() // 2))
+        try:
+            self._activate_window(window)
+            self._click_at(coords)
+            time.sleep(0.2)
+            keyboard.send_keys("^a", pause=0.05)
+            keyboard.send_keys("{BACKSPACE}", pause=0.05)
+            self._paste_text_to_active_window(text)
+            time.sleep(0.4)
+            keyboard.send_keys("{TAB}", pause=0.05)
+            time.sleep(0.4)
+            if self._read_input_value(control):
+                return True
+            if text.lower() in self._window_dump_text(window).lower():
+                return True
+        except Exception as exc:
+            self.logger.info(f"RPA-ввод в окне запроса завершился ошибкой: {exc}")
+        return False
+
+    def _activate_window(self, window) -> None:
+        try:
+            window.set_focus()
+        except Exception:
+            pass
+        try:
+            ctypes.windll.user32.SetForegroundWindow(window.handle)
+        except Exception:
+            pass
+        time.sleep(0.2)
+
+    def _find_descendant_by_titles_in_window(self, window, titles: list[str], control_types: list[str], timeout: int):
+        deadline = time.time() + timeout
+        wanted = {title.lower() for title in titles}
+        allowed_types = set(control_types)
+        while time.time() < deadline:
+            self._raise_if_error_dialog()
+            for item in self._iter_descendants(window):
+                text = self._safe_text(item).lower()
+                ctype = self._safe_control_type(item)
+                if text in wanted and ctype in allowed_types:
+                    return item
+            time.sleep(1)
+        raise RuntimeError(f"Не найден элемент {titles!r} ({', '.join(control_types)}) в окне.")
+
+    def _wait_window_dump_contains(self, window, text: str, timeout: int) -> None:
+        deadline = time.time() + timeout
+        needle = text.lower()
+        while time.time() < deadline:
+            self._raise_if_error_dialog()
+            if needle in self._window_dump_text(window).lower():
+                return
+            time.sleep(1)
+        raise RuntimeError(f"Не найден текст в окне {self._safe_text(window)!r}: {text!r}")
 
     def _handle_pending_approval(self) -> None:
         full_text = self._window_dump_text(self.main_window).lower()
@@ -779,8 +1110,12 @@ class OneCAgentUiTest:
         dump_path = target_dir / f"ui_failure_{stamp}.txt"
         controls_path = target_dir / f"ui_failure_controls_{stamp}.txt"
         try:
-            self.main_window.capture_as_image().save(target_dir / f"ui_failure_{stamp}.png")
-            self.logger.info(f"Сохранён скриншот: {target_dir / f'ui_failure_{stamp}.png'}")
+            image = self.main_window.capture_as_image()
+            if image is not None:
+                image.save(target_dir / f"ui_failure_{stamp}.png")
+                self.logger.info(f"Сохранён скриншот: {target_dir / f'ui_failure_{stamp}.png'}")
+            else:
+                self.logger.info("capture_as_image() вернул None, png-скриншот пропущен.")
         except Exception as exc:
             self.logger.error(f"Не удалось сохранить скриншот: {exc}")
         try:
@@ -856,6 +1191,11 @@ def parse_args() -> UiConfig:
         help="Пользователь 1С",
     )
     parser.add_argument(
+        "--password",
+        default="",
+        help="Пароль пользователя 1С",
+    )
+    parser.add_argument(
         "--prompt",
         default="какие поля есть у справочника Контрагенты",
         help="Текст сообщения агенту",
@@ -914,11 +1254,48 @@ def parse_args() -> UiConfig:
         action="store_true",
         help="Падать, если в UI не появилось ручное подтверждение",
     )
+    parser.add_argument(
+        "--test-case",
+        default="standard",
+        choices=["standard", "query1c_form", "web_query1c", "desktop_diag"],
+        help="Какой UI-сценарий запускать",
+    )
+    parser.add_argument(
+        "--query-text",
+        default="ВЫБРАТЬ 2 КАК Новое",
+        help="Текст запроса для сценария query1c_form",
+    )
+    parser.add_argument(
+        "--query-params-json",
+        default="",
+        help="Параметры запроса в JSON для сценариев Query1C",
+    )
+    parser.add_argument(
+        "--web-url",
+        default="http://192.168.2.133/aiagent_ui/ru_RU/",
+        help="URL опубликованного web-client 1С",
+    )
+    parser.add_argument(
+        "--chrome-exe",
+        default=r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        help="Путь к Chrome для browser UI test",
+    )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Запускать browser UI test с видимым окном браузера",
+    )
+    parser.add_argument(
+        "--skip-com-prepare",
+        action="store_true",
+        help="Не подготавливать Query1C через COM внутри гостя",
+    )
     args = parser.parse_args()
     return UiConfig(
         platform_exe=args.platform_exe,
         base_path=args.base_path,
         user=args.user,
+        password=args.password,
         prompt=args.prompt,
         dialog_type=args.dialog_type,
         expected_text=args.expected_text,
@@ -930,13 +1307,133 @@ def parse_args() -> UiConfig:
         leave_open=args.leave_open,
         approval_action=args.approval_action,
         require_approval=args.require_approval,
+        test_case=args.test_case,
+        query_text=args.query_text,
+        query_params_json=args.query_params_json,
+        web_url=args.web_url,
+        chrome_exe=args.chrome_exe,
+        headed=args.headed,
+        skip_com_prepare=args.skip_com_prepare,
     )
+
+
+def run_web_query1c_test(config: UiConfig, logger: Logger) -> int:
+    web_script = REPO_ROOT / "automation" / "ui" / "web_query1c_test.py"
+    web_url = config.web_url
+    if isinstance(config.platform_exe, str) and config.platform_exe.lower().startswith(("http://", "https://")):
+        web_url = config.platform_exe
+    command = [
+        sys.executable,
+        "-u",
+        str(web_script),
+        "--web-url",
+        web_url,
+        "--chrome-exe",
+        config.chrome_exe,
+        "--base-path",
+        config.base_path,
+        "--user",
+        config.user,
+        "--password",
+        config.password,
+        "--query-text",
+        config.query_text,
+        "--query-params-json",
+        config.query_params_json,
+        "--expected-text",
+        config.expected_text,
+        "--timeout-sec",
+        str(config.timeout_sec),
+    ]
+    if config.log_file:
+        command.extend(["--log-file", config.log_file])
+    if config.screenshot_dir:
+        command.extend(["--artifact-dir", config.screenshot_dir])
+    if config.headed:
+        command.append("--headed")
+    if config.skip_com_prepare or HOST_PREPARED_QUERY1C_MARKER in config.prompt:
+        command.append("--skip-com-prepare")
+
+    logger.info("Переключаемся на browser UI сценарий web_query1c.")
+    process = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if process.stdout:
+        print(process.stdout, end="")
+    return process.returncode
+
+
+def run_desktop_diagnostics(config: UiConfig, logger: Logger) -> int:
+    candidates = [
+        r"C:\Tools\1cv8\8.5.1.1150\bin\1cv8.exe",
+        r"C:\Program Files\1cv8\8.5.1.1150\bin\1cv8.exe",
+        r"C:\Program Files\1cv8\common\1cestart.exe",
+        r"C:\Program Files (x86)\1cv8\common\1cestart.exe",
+    ]
+    found = [candidate for candidate in candidates if Path(candidate).exists()]
+    logger.info(f"Desktop diagnostics, found executables: {found}")
+    if not found:
+        raise RuntimeError("На VM не найден ни один ожидаемый путь к 1С клиенту.")
+    client_env = os.environ.copy()
+    OneCAgentUiTest._clear_proxy_env(client_env)
+    cmd = [
+        config.platform_exe,
+        "ENTERPRISE",
+        "/DisableStartupDialogs",
+        "/DisableStartupMessages",
+        "/F",
+        config.base_path,
+        "/N",
+        config.user,
+    ]
+    logger.info(f"Desktop diagnostics, launch command: {cmd}")
+    process = None
+    try:
+        process = subprocess.Popen(cmd, env=client_env)
+        time.sleep(15)
+        windows = []
+        for win in Desktop(backend=config.backend).windows():
+            try:
+                if win.process_id() != process.pid:
+                    continue
+                windows.append(
+                    {
+                        "title": win.window_text(),
+                        "visible": win.is_visible(),
+                        "enabled": win.is_enabled(),
+                        "class_name": win.class_name(),
+                    }
+                )
+            except Exception:
+                continue
+        logger.info(f"Desktop diagnostics, process windows: {windows}")
+    finally:
+        if process is not None:
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except Exception:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+    return 0
 
 
 def main() -> int:
     setup_console_encoding()
     config = parse_args()
     logger = Logger(config.log_file)
+    if config.test_case == "web_query1c":
+        return run_web_query1c_test(config, logger)
+    if config.test_case == "desktop_diag":
+        return run_desktop_diagnostics(config, logger)
     runner = OneCAgentUiTest(config, logger)
     return runner.run()
 

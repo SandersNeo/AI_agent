@@ -2,3 +2,4 @@
 # Установка: pip install -r automation/ui/requirements-ui.txt
 pywinauto>=0.6.8
 pywin32>=306
+websocket-client>=1.8.0

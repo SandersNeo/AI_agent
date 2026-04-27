@@ -10,7 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DESKTOP_DIR = Path.home() / "Desktop"
-HOST_REPO_ROOT = Path(r"H:\EDTApps\AI_agent")
+HOST_REPO_ROOT = Path(r"\\DEV1\D\EDTApps\AI_agent")
 STARTUP_DIR = Path(
     os.environ.get(
         "APPDATA",
@@ -93,7 +93,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--jobs-root",
-        default=r"H:\EDTApps\AI_agent\automation\logs\vm_ui_jobs",
+        default=r"\\DEV1\D\EDTApps\AI_agent\automation\logs\vm_ui_jobs",
         help="Каталог jobs, который guest UI agent будет опрашивать",
     )
     args = parser.parse_args()

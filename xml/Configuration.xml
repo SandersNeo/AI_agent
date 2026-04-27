@@ -116,6 +116,7 @@
 			<CommonCommand>ИИА_Агент</CommonCommand>
 			<CommonCommand>ИИА_RAG</CommonCommand>
 			<CommonForm>ИИА_Агент</CommonForm>
+			<CommonForm>ИИА_Запрос1С</CommonForm>
 			<CommonForm>ИИА_РегистрацияGitsell</CommonForm>
 			<CommonForm>ИИА_Настройки</CommonForm>
 			<CommonForm>ИИА_RAG</CommonForm>

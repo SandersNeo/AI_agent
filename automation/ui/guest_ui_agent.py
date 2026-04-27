@@ -102,6 +102,78 @@ class GuestUiAgent:
         run_dir = ensure_dir(Path(str(job["run_dir"])))
         log_file = Path(str(job["log_file"]))
         screenshot_dir = ensure_dir(Path(str(job["screenshot_dir"])))
+        launcher_output_log = run_dir / "guest_agent_subprocess.log"
+        command = self._build_test_command(job, log_file, screenshot_dir)
+
+        append_agent_log(self.agent_log, f"starting ui test for job {job['job_id']}")
+        started_at = utc_now()
+        process = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        finished_at = utc_now()
+        if process.stdout:
+            launcher_output_log.write_text(process.stdout, encoding="utf-8")
+        artifacts = [str(path) for path in sorted(screenshot_dir.glob("*"))]
+        if launcher_output_log.exists():
+            artifacts.append(str(launcher_output_log))
+
+        return {
+            "job_id": job["job_id"],
+            "status": "completed" if process.returncode == 0 else "failed",
+            "exit_code": process.returncode,
+            "started_at_utc": started_at,
+            "finished_at_utc": finished_at,
+            "run_dir": str(run_dir),
+            "log_file": str(log_file),
+            "screenshot_dir": str(screenshot_dir),
+            "artifacts": artifacts,
+        }
+
+    def _build_test_command(
+        self,
+        job: dict[str, object],
+        log_file: Path,
+        screenshot_dir: Path,
+    ) -> list[str]:
+        ui_mode = str(job.get("ui_mode", "desktop")).lower()
+        if ui_mode == "web":
+            command = [
+                sys.executable,
+                "-u",
+                str(REPO_ROOT / "automation" / "ui" / "web_query1c_test.py"),
+                "--web-url",
+                str(job.get("web_url", "http://localhost/aiagent_ui/ru_RU/")),
+                "--chrome-exe",
+                str(job.get("chrome_exe", r"C:\Program Files\Google\Chrome\Application\chrome.exe")),
+                "--base-path",
+                str(job["base_path"]),
+                "--user",
+                str(job["user"]),
+                "--password",
+                str(job.get("password", "")),
+                "--query-text",
+                str(job.get("query_text", "ВЫБРАТЬ 2 КАК Новое")),
+                "--query-params-json",
+                str(job.get("query_params_json", "")),
+                "--expected-text",
+                str(job["expected_text"]),
+                "--timeout-sec",
+                str(job.get("timeout_sec", 180)),
+                "--log-file",
+                str(log_file),
+                "--artifact-dir",
+                str(screenshot_dir),
+            ]
+            if job.get("headed"):
+                command.append("--headed")
+            return command
+
         command = [
             sys.executable,
             "-u",
@@ -114,6 +186,12 @@ class GuestUiAgent:
             str(job["user"]),
             "--dialog-type",
             str(job.get("dialog_type", "Агент")),
+            "--test-case",
+            str(job.get("test_case", "standard")),
+            "--query-text",
+            str(job.get("query_text", "ВЫБРАТЬ 2 КАК Новое")),
+            "--query-params-json",
+            str(job.get("query_params_json", "")),
             "--prompt",
             str(job["prompt"]),
             "--expected-text",
@@ -135,31 +213,14 @@ class GuestUiAgent:
             command.append("--require-approval")
         if job.get("leave_open"):
             command.append("--leave-open")
-
-        append_agent_log(self.agent_log, f"starting ui test for job {job['job_id']}")
-        started_at = utc_now()
-        process = subprocess.run(command, cwd=REPO_ROOT)
-        finished_at = utc_now()
-        artifacts = [str(path) for path in sorted(screenshot_dir.glob("*"))]
-
-        return {
-            "job_id": job["job_id"],
-            "status": "completed" if process.returncode == 0 else "failed",
-            "exit_code": process.returncode,
-            "started_at_utc": started_at,
-            "finished_at_utc": finished_at,
-            "run_dir": str(run_dir),
-            "log_file": str(log_file),
-            "screenshot_dir": str(screenshot_dir),
-            "artifacts": artifacts,
-        }
+        return command
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Фоновый агент UI-тестов внутри гостевой Windows VM")
     parser.add_argument(
         "--jobs-root",
-        default=r"H:\EDTApps\AI_agent\automation\logs\vm_ui_jobs",
+        default=r"\\DEV1\D\bsl\AI_agent\automation\logs\vm_ui_jobs",
         help="Каталог очереди UI jobs, доступный и хосту, и гостю",
     )
     parser.add_argument("--poll-sec", type=float, default=2.0)

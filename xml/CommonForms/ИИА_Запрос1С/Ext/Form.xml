@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcssch="http://v8.1c.ru/8.1/data-composition-system/schema" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:pal="http://v8.1c.ru/8.1/data/ui/colors/palette" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.14">
+	<WindowOpeningMode>Независимый</WindowOpeningMode>
+	<Group>Vertical</Group>
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
+		<ChildItems>
+			<Button name="ФормаВыполнить" id="10">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.Выполнить</CommandName>
+				<ExtendedTooltip name="ФормаВыполнитьРасширеннаяПодсказка" id="11"/>
+			</Button>
+			<Button name="ФормаЗакрыть" id="12">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.ЗакрытьФорму</CommandName>
+				<ExtendedTooltip name="ФормаЗакрытьРасширеннаяПодсказка" id="13"/>
+			</Button>
+		</ChildItems>
+	</AutoCommandBar>
+	<Events>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<LabelField name="Статус" id="1">
+			<DataPath>Статус</DataPath>
+			<TitleLocation>None</TitleLocation>
+			<ContextMenu name="СтатусКонтекстноеМеню" id="2"/>
+			<ExtendedTooltip name="СтатусРасширеннаяПодсказка" id="3"/>
+		</LabelField>
+		<InputField name="ТекстЗапроса" id="4">
+			<DataPath>ТекстЗапроса</DataPath>
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Текст запроса</v8:content>
+				</v8:item>
+			</Title>
+			<Height>8</Height>
+			<AutoMaxHeight>false</AutoMaxHeight>
+			<HorizontalStretch>true</HorizontalStretch>
+			<MultiLine>true</MultiLine>
+			<ContextMenu name="ТекстЗапросаКонтекстноеМеню" id="5"/>
+			<ExtendedTooltip name="ТекстЗапросаРасширеннаяПодсказка" id="6"/>
+			<Events>
+				<Event name="OnChange">ТекстЗапросаПриИзменении</Event>
+			</Events>
+		</InputField>
+		<Table name="ПараметрыЗапросаТаблица" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Параметры запроса</v8:content>
+				</v8:item>
+			</Title>
+			<Representation>List</Representation>
+			<Height>8</Height>
+			<AutoMaxHeight>false</AutoMaxHeight>
+			<HorizontalStretch>true</HorizontalStretch>
+			<HorizontalLinesBWA>true</HorizontalLinesBWA>
+			<VerticalLinesBWA>true</VerticalLinesBWA>
+			<AutoInsertNewRow>true</AutoInsertNewRow>
+			<DataPath>ПараметрыЗапросаТаблица</DataPath>
+			<RowFilter xsi:nil="true"/>
+			<ContextMenu name="ПараметрыЗапросаТаблицаКонтекстноеМеню" id="8"/>
+			<AutoCommandBar name="ПараметрыЗапросаТаблицаКоманднаяПанель" id="9">
+				<Autofill>false</Autofill>
+			</AutoCommandBar>
+			<ExtendedTooltip name="ПараметрыЗапросаТаблицаРасширеннаяПодсказка" id="19"/>
+			<ChildItems>
+				<InputField name="ПараметрыЗапросаТаблицаИмяПараметра" id="20">
+					<DataPath>ПараметрыЗапросаТаблица.ИмяПараметра</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<Width>20</Width>
+					<ContextMenu name="ПараметрыЗапросаТаблицаИмяПараметраКонтекстноеМеню" id="21"/>
+					<ExtendedTooltip name="ПараметрыЗапросаТаблицаИмяПараметраРасширеннаяПодсказка" id="22"/>
+					<Events>
+						<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="ПараметрыЗапросаТаблицаТипПараметра" id="23">
+					<DataPath>ПараметрыЗапросаТаблица.ТипПараметра</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<Width>12</Width>
+					<ContextMenu name="ПараметрыЗапросаТаблицаТипПараметраКонтекстноеМеню" id="24"/>
+					<ExtendedTooltip name="ПараметрыЗапросаТаблицаТипПараметраРасширеннаяПодсказка" id="25"/>
+					<Events>
+						<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="ПараметрыЗапросаТаблицаЗначениеПараметра" id="26">
+					<DataPath>ПараметрыЗапросаТаблица.ЗначениеПараметра</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<Width>30</Width>
+					<ContextMenu name="ПараметрыЗапросаТаблицаЗначениеПараметраКонтекстноеМеню" id="27"/>
+					<ExtendedTooltip name="ПараметрыЗапросаТаблицаЗначениеПараметраРасширеннаяПодсказка" id="28"/>
+					<Events>
+						<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+					</Events>
+				</InputField>
+			</ChildItems>
+		</Table>
+		<Button name="ВыполнитьКнопка" id="14">
+			<Type>UsualButton</Type>
+			<CommandName>Form.Command.Выполнить</CommandName>
+			<HorizontalStretch>false</HorizontalStretch>
+			<ExtendedTooltip name="ВыполнитьКнопкаРасширеннаяПодсказка" id="15"/>
+		</Button>
+		<InputField name="РезультатЗапроса" id="16">
+			<DataPath>РезультатЗапроса</DataPath>
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Результат</v8:content>
+				</v8:item>
+			</Title>
+			<Height>18</Height>
+			<AutoMaxHeight>false</AutoMaxHeight>
+			<HorizontalStretch>true</HorizontalStretch>
+			<VerticalStretch>true</VerticalStretch>
+			<MultiLine>true</MultiLine>
+			<ReadOnly>true</ReadOnly>
+			<ContextMenu name="РезультатЗапросаКонтекстноеМеню" id="17"/>
+			<ExtendedTooltip name="РезультатЗапросаРасширеннаяПодсказка" id="18"/>
+		</InputField>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="СсылкаДиалога" id="1">
+			<Type>
+				<v8:Type>cfg:CatalogRef.ИИА_Диалоги</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ТекстЗапроса" id="2">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ПараметрыЗапросаТаблица" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Параметры запроса</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:ValueTable</v8:Type>
+			</Type>
+			<Columns>
+				<Column name="ИмяПараметра" id="1">
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Имя</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>xs:string</v8:Type>
+						<v8:StringQualifiers>
+							<v8:Length>0</v8:Length>
+							<v8:AllowedLength>Variable</v8:AllowedLength>
+						</v8:StringQualifiers>
+					</Type>
+				</Column>
+				<Column name="ТипПараметра" id="2">
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Тип</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>xs:string</v8:Type>
+						<v8:StringQualifiers>
+							<v8:Length>0</v8:Length>
+							<v8:AllowedLength>Variable</v8:AllowedLength>
+						</v8:StringQualifiers>
+					</Type>
+				</Column>
+				<Column name="ЗначениеПараметра" id="3">
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Значение</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>xs:string</v8:Type>
+						<v8:StringQualifiers>
+							<v8:Length>0</v8:Length>
+							<v8:AllowedLength>Variable</v8:AllowedLength>
+						</v8:StringQualifiers>
+					</Type>
+				</Column>
+			</Columns>
+		</Attribute>
+		<Attribute name="ПараметрыЗапросаJSON" id="6">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="РезультатЗапроса" id="4">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="Статус" id="5">
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="Выполнить" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Выполнить</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ВыполнитьКоманду</Action>
+		</Command>
+		<Command name="ЗакрытьФорму" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Закрыть</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ЗакрытьФорму</Action>
+		</Command>
+	</Commands>
+</Form>

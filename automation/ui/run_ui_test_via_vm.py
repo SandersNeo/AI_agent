@@ -9,10 +9,19 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
+AUTOMATION_ROOT = REPO_ROOT / "automation"
+for _path in (REPO_ROOT, AUTOMATION_ROOT):
+    _path_str = str(_path)
+    if _path_str not in sys.path:
+        sys.path.insert(0, _path_str)
+
+from com_1c import call_procedure, connect_to_1c, get_enum_value
+
+
 DEFAULT_HOST_JOBS_ROOT = REPO_ROOT / "automation" / "logs" / "vm_ui_jobs"
-DEFAULT_GUEST_JOBS_ROOT = r"H:\EDTApps\AI_agent\automation\logs\vm_ui_jobs"
+DEFAULT_GUEST_JOBS_ROOT = r"\\DEV1\D\bsl\AI_agent\automation\logs\vm_ui_jobs"
+HOST_PREPARED_QUERY1C_MARKER = "__HOST_PREPARED_QUERY1C__"
 
 
 def ensure_dir(path: Path) -> Path:
@@ -25,13 +34,18 @@ def timestamp() -> str:
 
 
 def build_job(args: argparse.Namespace, job_id: str, run_dir: Path) -> dict[str, object]:
+    prompt = args.prompt
+    if args.prepare_query1c_on_host and HOST_PREPARED_QUERY1C_MARKER not in prompt:
+        prompt = f"{prompt} {HOST_PREPARED_QUERY1C_MARKER}".strip()
     return {
         "job_id": job_id,
         "created_at_local": datetime.now().isoformat(),
+        "ui_mode": args.ui_mode,
         "platform_exe": args.platform_exe,
         "base_path": args.base_path,
         "user": args.user,
-        "prompt": args.prompt,
+        "password": args.password,
+        "prompt": prompt,
         "dialog_type": args.dialog_type,
         "expected_text": args.expected_text,
         "timeout_sec": args.timeout_sec,
@@ -40,6 +54,13 @@ def build_job(args: argparse.Namespace, job_id: str, run_dir: Path) -> dict[str,
         "approval_action": args.approval_action,
         "require_approval": args.require_approval,
         "leave_open": args.leave_open,
+        "test_case": args.test_case,
+        "query_text": args.query_text,
+        "query_params_json": args.query_params_json,
+        "web_url": args.web_url,
+        "chrome_exe": args.chrome_exe,
+        "headed": args.headed,
+        "skip_com_prepare": args.prepare_query1c_on_host,
         "run_dir": str(run_dir),
         "log_file": str(run_dir / "ui_test.log"),
         "screenshot_dir": str(run_dir / "artifacts"),
@@ -59,8 +80,36 @@ def wait_for_result(host_jobs_root: Path, job_id: str, timeout_sec: int) -> Path
     raise TimeoutError(f"Не дождались завершения VM UI job {job_id}")
 
 
+def prepare_query1c_dialog_on_host(args: argparse.Namespace) -> None:
+    connection_string = f'File="{args.base_path}";Usr="{args.user}";Pwd="{args.password}";'
+    connection = connect_to_1c(connection_string)
+    if not connection:
+        raise RuntimeError("Не удалось открыть COM-подключение к 1С на хосте для подготовки Query1C.")
+    dialog_type = get_enum_value(connection, "ИИА_ТипДиалога", "Запрос1С")
+    if dialog_type is None:
+        raise RuntimeError("Не найдено перечисление ИИА_ТипДиалога.Запрос1С на хосте.")
+    dialog_ref = call_procedure(
+        connection,
+        "ИИА_Сервер",
+        "СоздатьНовыйДиалог",
+        args.user,
+        dialog_type,
+    )
+    if dialog_ref is None:
+        raise RuntimeError("Хост не получил ссылку на диалог Query1C.")
+    call_procedure(
+        connection,
+        "ИИА_Сервер",
+        "СохранитьЧерновикЗапроса1С",
+        dialog_ref,
+        args.query_text,
+        args.query_params_json,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Запуск UI-теста 1С через гостевого VM-агента")
+    parser.add_argument("--ui-mode", default="desktop", choices=["desktop", "web"])
     parser.add_argument("--prompt", default="какие поля есть у справочника Контрагенты")
     parser.add_argument("--expected-text", default="Поля успешно получены")
     parser.add_argument("--timeout-sec", type=int, default=180)
@@ -71,7 +120,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--platform-exe", default=r"C:\Tools\1cv8\8.5.1.1150\bin\1cv8.exe")
     parser.add_argument("--base-path", default=r"\\DEV1\AIBase$")
     parser.add_argument("--user", default="Администратор")
+    parser.add_argument("--password", default="")
     parser.add_argument("--dialog-type", default="Агент")
+    parser.add_argument("--test-case", default="standard", choices=["standard", "query1c_form", "web_query1c", "desktop_diag"])
+    parser.add_argument("--query-text", default="ВЫБРАТЬ 2 КАК Новое")
+    parser.add_argument("--query-params-json", default="")
+    parser.add_argument("--web-url", default="http://localhost/aiagent_ui/ru_RU/")
+    parser.add_argument("--chrome-exe", default=r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+    parser.add_argument("--headed", action="store_true")
+    parser.add_argument("--prepare-query1c-on-host", action="store_true")
     parser.add_argument("--leave-open", action="store_true")
     parser.add_argument("--wait-timeout-sec", type=int, default=600)
     parser.add_argument("--host-jobs-root", default=str(DEFAULT_HOST_JOBS_ROOT))
@@ -81,6 +138,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.prepare_query1c_on_host:
+        prepare_query1c_dialog_on_host(args)
     host_jobs_root = ensure_dir(Path(args.host_jobs_root))
     ensure_dir(host_jobs_root / "pending")
     ensure_dir(host_jobs_root / "running")
