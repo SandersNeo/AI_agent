@@ -126,7 +126,7 @@ SUMMARY_MARKER = "=== РЕЗЮМЕ ВЫПОЛНЕННОЙ РАБОТЫ ==="
 SUMMARY_NOT_FORMED = "Резюме не сформировано"
 
 # Версия скоринга для отслеживания изменений формулы
-SCORE_VERSION = "v1"
+SCORE_VERSION = "v2"
 
 # Режим/порог quality gate
 QUALITY_GATE_MIN_AVG_SCORE = 70
@@ -249,12 +249,37 @@ SCENARIO_RULES_BY_ID = {
     "ambiguous_object_resolution": {
         "expect_success": True,
         "allow_empty_result": True,
-        "required_actions_any": ["GetMetadata", "RunQuery"],
+        "required_actions_any": ["RunQuery"],
         "required_actions_all": [],
         "forbidden_actions": [],
         "max_errors": 36,
         "require_recovery": False,
         "require_zero_rows": False,
+        "required_log_patterns_all": [
+            {
+                "pattern": r"(?:\"columns\"\s*:\s*\[[^\]]*\"День\"[^\]]*\"Сумма\"|КАК\s+День[\s\S]{0,500}КАК\s+Сумма)",
+                "reason": "В результате/запросе должны быть бизнес-колонки День и Сумма",
+                "scope": "full_log",
+            },
+            {
+                "pattern": r"Результат\s+запроса\s*:\s*строк\s*(?:=|\s)\s*\d+",
+                "reason": "ShowInfo должен явно вывести результат запроса",
+            },
+        ],
+        "forbidden_log_patterns": [
+            {
+                "pattern": r"ВЫБРАТЬ\s+1\s+КАК\s+(?:Н|Значение)\b",
+                "reason": "Обнаружен технический fallback-запрос вместо бизнес-запроса",
+            },
+            {
+                "pattern": r"\b1\.\s*(?:Н|Значение)\s*:\s*1\b",
+                "reason": "ShowInfo вывел техническую заглушку 1 вместо результата",
+            },
+            {
+                "pattern": r"Задача\s+выполнена\s+успешно[\s\S]{0,800}\b(?:Н|Значение)\s*:\s*1\b",
+                "reason": "Итог пометил заглушку как успешное выполнение",
+            },
+        ],
     },
 }
 
@@ -323,6 +348,8 @@ def analyze_log(log_text: str) -> dict:
         "recovery_attempts": 0,
         "runquery_zero_rows": False,
         "premature_giveup_detected": False,
+        "non_system_text": "",
+        "full_log_text": log_text or "",
     }
 
     if not log_text:
@@ -392,6 +419,7 @@ def analyze_log(log_text: str) -> dict:
 
     # Для сценарных правил используем "рабочее" множество действий без системных строк.
     non_system_text = "\n".join(non_system_lines)
+    analysis["non_system_text"] = non_system_text
     dsl_actions = re.findall(
         r"(RunQuery|GetMetadata|GetObjectFields|FindReferenceByName|CreateDocument|CreateReference|ShowInfo|CheckObjectExists|SelectObject|Write|SetField|FindReferenceByGUID|FindReferenceByURL|ForEach|SaveToStorage|LoadFromStorage)",
         non_system_text,
@@ -469,6 +497,9 @@ def _get_scenario_rule(example_id: str) -> dict:
         "max_errors": int(rule.get("max_errors", 999)),
         "require_recovery": bool(rule.get("require_recovery", False)),
         "require_zero_rows": bool(rule.get("require_zero_rows", False)),
+        "required_log_patterns_all": list(rule.get("required_log_patterns_all", [])),
+        "required_log_patterns_any": list(rule.get("required_log_patterns_any", [])),
+        "forbidden_log_patterns": list(rule.get("forbidden_log_patterns", [])),
     }
 
 
@@ -516,6 +547,38 @@ def evaluate_scenario_rules(example: dict, success: bool, analysis: dict, usage_
 
     if rule["require_zero_rows"] and not analysis.get("runquery_zero_rows", False):
         violations.append("Для сценария ожидался пустой результат (0 строк), но признак не найден")
+
+    scenario_text = str(analysis.get("non_system_text", "") or "")
+    for pattern_rule in rule.get("required_log_patterns_all", []):
+        pattern = str(pattern_rule.get("pattern", "") if isinstance(pattern_rule, dict) else pattern_rule)
+        reason = str(pattern_rule.get("reason", pattern) if isinstance(pattern_rule, dict) else pattern)
+        scope = str(pattern_rule.get("scope", "non_system") if isinstance(pattern_rule, dict) else "non_system")
+        search_text = str(analysis.get("full_log_text", "") if scope == "full_log" else scenario_text)
+        if pattern and not re.search(pattern, search_text, re.I | re.S):
+            violations.append(f"Не найден обязательный признак в логе: {reason}")
+        elif pattern:
+            evidences.append(f"Найден обязательный признак в логе: {reason}")
+
+    required_any_patterns = rule.get("required_log_patterns_any", [])
+    if required_any_patterns:
+        matched_any = []
+        expected_any = []
+        for pattern_rule in required_any_patterns:
+            pattern = str(pattern_rule.get("pattern", "") if isinstance(pattern_rule, dict) else pattern_rule)
+            reason = str(pattern_rule.get("reason", pattern) if isinstance(pattern_rule, dict) else pattern)
+            expected_any.append(reason)
+            if pattern and re.search(pattern, scenario_text, re.I | re.S):
+                matched_any.append(reason)
+        if not matched_any:
+            violations.append(f"Не найден ни один обязательный признак(any) в логе: {', '.join(expected_any)}")
+        else:
+            evidences.append(f"Найден обязательный признак(any) в логе: {', '.join(matched_any)}")
+
+    for pattern_rule in rule.get("forbidden_log_patterns", []):
+        pattern = str(pattern_rule.get("pattern", "") if isinstance(pattern_rule, dict) else pattern_rule)
+        reason = str(pattern_rule.get("reason", pattern) if isinstance(pattern_rule, dict) else pattern)
+        if pattern and re.search(pattern, scenario_text, re.I | re.S):
+            violations.append(f"Обнаружен запрещенный признак в логе: {reason}")
 
     profile = TOKEN_BUDGETS_BY_EXAMPLE.get(example_id)
     if profile and usage_tokens > int(profile.get("hard_limit", 10**9)):

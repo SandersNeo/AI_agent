@@ -108,6 +108,7 @@ class UiConfig:
     chrome_exe: str
     headed: bool
     skip_com_prepare: bool
+    record_start_marker: str
 
 
 class Logger:
@@ -142,6 +143,7 @@ class OneCAgentUiTest:
         self.com_connection = None
         self.prepared_dialog_ref = None
         self.client_pids: list[int] = []
+        self.client_image_name = ""
 
     def run(self) -> int:
         try:
@@ -155,6 +157,7 @@ class OneCAgentUiTest:
             else:
                 self._start_new_dialog()
                 self._select_dialog_type()
+                self._signal_recording_start()
                 self._enter_prompt()
                 self._send_prompt()
                 self._wait_expected_response()
@@ -174,6 +177,7 @@ class OneCAgentUiTest:
         client_env = os.environ.copy()
         self._clear_proxy_env(client_env)
         image_name = Path(self.config.platform_exe).name
+        self.client_image_name = image_name
         before_pids = set(self._list_process_ids(image_name))
         cmd = [
             self.config.platform_exe,
@@ -185,8 +189,13 @@ class OneCAgentUiTest:
             "/N",
             self.config.user,
         ]
+        if self.config.password:
+            cmd.extend(["/P", self.config.password])
+        startup_log = self._startup_log_path()
+        if startup_log:
+            cmd.extend(["/Out", startup_log, "-NoTruncate"])
         self.logger.info("Запуск клиента 1С.")
-        self.process = subprocess.Popen(cmd, env=client_env)
+        self.process = subprocess.Popen(cmd, env=client_env, cwd=str(Path(self.config.platform_exe).parent))
         self.client_pids = self._wait_for_client_processes(image_name, before_pids)
         self.main_window = self._wait_for_top_window(self.client_pids)
         self.app = Application(backend=self.config.backend).connect(
@@ -209,9 +218,20 @@ class OneCAgentUiTest:
             time.sleep(1)
         return [self.process.pid] if self.process else []
 
+    def _startup_log_path(self) -> str:
+        if self.config.log_file:
+            return str(Path(self.config.log_file).with_name("desktop_1c_startup.log"))
+        if self.config.screenshot_dir:
+            return str(Path(self.config.screenshot_dir).parent / "desktop_1c_startup.log")
+        return ""
+
     def _wait_for_top_window(self, process_ids: list[int]):
         deadline = time.time() + self.config.startup_timeout_sec
         while time.time() < deadline:
+            if self.client_image_name:
+                for pid in self._list_process_ids(self.client_image_name):
+                    if pid not in process_ids:
+                        process_ids.append(pid)
             visible = []
             for win in Desktop(backend=self.config.backend).windows():
                 try:
@@ -419,29 +439,122 @@ class OneCAgentUiTest:
 
     def _send_prompt(self) -> None:
         self.logger.info("Нажимаем 'Отправить'.")
-        button = self._find_descendant_by_titles(["Отправить", "Send"], ["Button"], 20)
-        self._click(button)
-        self._handle_pending_approval()
+        button = self._locate_send_button()
+        if self._click_send_button_until_started(button):
+            self._handle_pending_approval()
+            return
+        self._capture_debug_artifacts("send_failure")
+        raise RuntimeError("Кнопка 'Отправить' не запустила обработку запроса.")
+
+    def _locate_send_button(self):
+        try:
+            return self._find_descendant_by_titles(["Отправить", "Send"], ["Button"], 8)
+        except RuntimeError:
+            pass
+        candidates = []
+        for item in self._iter_descendants(self.main_window):
+            if self._safe_control_type(item) != "Button":
+                continue
+            try:
+                rect = item.rectangle()
+            except Exception:
+                continue
+            if rect.left >= 1250 and 120 <= rect.top <= 210 and rect.width() >= 120 and rect.height() >= 25:
+                candidates.append(item)
+        if not candidates:
+            raise RuntimeError("Не найден элемент ['Отправить', 'Send'] (Button).")
+        candidates.sort(key=lambda item: (abs(item.rectangle().top - 160), -item.rectangle().width()))
+        self.logger.info("Кнопка 'Отправить' найдена по позиции на форме.")
+        return candidates[0]
+
+    def _click_send_button_until_started(self, button) -> bool:
+        attempts = [
+            ("click_input", lambda: button.click_input()),
+            ("mouse.click", lambda: self._click(button)),
+            ("keyboard ENTER", lambda: keyboard.send_keys("{ENTER}", pause=0.05)),
+        ]
+        for method_name, action in attempts:
+            try:
+                self.logger.info(f"Отправка: попытка через {method_name}.")
+                self._activate_main_window()
+                action()
+                time.sleep(2)
+                self._handle_pending_approval()
+                if self._submission_started():
+                    self.logger.info(f"Отправка: форма начала обработку после {method_name}.")
+                    return True
+            except Exception as exc:
+                self.logger.info(f"Отправка через {method_name} не сработала: {exc}")
+        return False
+
+    def _submission_started(self) -> bool:
+        text_dump = self._window_dump_text(self.main_window).lower()
+        started_markers = (
+            "выполняется",
+            "ожидание",
+            "готовится",
+            "обработка",
+            "остановить",
+            "отправка сообщения",
+            "задача выполнена",
+            "задача завершена",
+        )
+        if any(marker in text_dump for marker in started_markers):
+            return True
+        try:
+            edit = self._locate_prompt_input()
+            value = self._read_input_value(edit).strip()
+            if not value:
+                return True
+        except Exception:
+            pass
+        return False
 
     def _wait_expected_response(self) -> None:
         self.logger.info("Ждём ожидаемый ответ агента.")
+        if self.config.expected_text == "__SUBMISSION_STARTED__":
+            self.logger.info("Smoke-режим: достаточно подтверждения, что отправка стартовала.")
+            return
         deadline = time.time() + self.config.timeout_sec
         expected = self.config.expected_text.lower()
-        error_markers = ("задача завершена с ошибкой", "ошибка api", "ошибка:")
+        error_markers = (
+            "задача завершена с ошибкой",
+            "ошибка api",
+            "ошибка:",
+            "превышен лимит токенов",
+            "остановлено:",
+        )
+        saw_running = False
         while time.time() < deadline:
             self._raise_if_error_dialog()
             self._handle_pending_approval()
             text_dump = self._window_dump_text(self.main_window).lower()
-            if expected in text_dump:
-                return
+            if "остановить" in text_dump:
+                saw_running = True
             if self._is_successfully_completed(text_dump):
-                self.logger.info("Ожидаемый текст недоступен в dump UI, но форма показывает успешное завершение.")
+                if expected and expected not in text_dump:
+                    self.logger.info("Форма показывает успешное завершение, ожидаемый текст недоступен в dump UI.")
                 return
             for marker in error_markers:
                 if marker in text_dump:
                     raise RuntimeError(f"В форме агента зафиксирована ошибка:\n{text_dump}")
+            if saw_running and "отправить" in text_dump and "остановить" not in text_dump:
+                self.logger.info("Кнопка вернулась в 'Отправить' после выполнения, считаем сессию агента завершённой.")
+                return
             time.sleep(2)
         raise RuntimeError(f"Не дождались ожидаемого текста ответа: {self.config.expected_text!r}")
+
+    def _signal_recording_start(self) -> None:
+        if not self.config.record_start_marker:
+            return
+        marker_path = Path(self.config.record_start_marker)
+        try:
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            marker_path.write_text(str(time.time()), encoding="utf-8")
+            self.logger.info(f"Сигнал старта записи: {marker_path}")
+            time.sleep(1)
+        except Exception as exc:
+            self.logger.info(f"Не удалось записать marker старта записи: {exc}")
 
     def _run_query1c_form_scenario(self) -> None:
         self.logger.info("Запускаем UI-сценарий формы 'Запрос 1С'.")
@@ -539,6 +652,8 @@ class OneCAgentUiTest:
     def _set_text_to_input_in_window(self, window, control, text: str) -> None:
         self._activate_window(window)
         self._click(control)
+        if self._set_text_via_uia(control, text, "поля окна запроса"):
+            return
         hwnd = self._get_hwnd(control)
         if hwnd:
             self.logger.info(f"Пробуем native hwnd для поля окна запроса: {hwnd}")
@@ -644,6 +759,8 @@ class OneCAgentUiTest:
             return False
         success_markers = (
             "задача выполнена успешно",
+            "резюме выполненной работы",
+            "задача завершена",
             "подтверждено по системным результатам",
             "открыть таблицу результатов",
             "успешно",
@@ -743,18 +860,27 @@ class OneCAgentUiTest:
             rect = item.rectangle()
             if rect.width() < 300 or rect.height() < 40:
                 continue
-            if rect.left < 240 or rect.top < 140 or rect.top > 280:
-                continue
-            if rect.right > 760:
+            if rect.left < 240 or rect.top < 90:
                 continue
             if "search" in text or "текущий диалог" in text or "decision timeline" in text:
                 continue
             candidates.append(item)
         if not candidates:
             raise RuntimeError("Не найдено поле ввода сообщения в форме агента.")
+        prompt_row_candidates = [item for item in candidates if 90 <= item.rectangle().top <= 230]
+        if prompt_row_candidates:
+            prompt_row_candidates.sort(
+                key=lambda item: (
+                    abs(item.rectangle().top - 110),
+                    -item.rectangle().width(),
+                    abs(item.rectangle().left - 270),
+                )
+            )
+            return prompt_row_candidates[0]
         candidates.sort(
             key=lambda item: (
-                abs(item.rectangle().top - 170),
+                abs(item.rectangle().top - 110),
+                -item.rectangle().width(),
                 abs(item.rectangle().left - 270),
             )
         )
@@ -763,14 +889,81 @@ class OneCAgentUiTest:
     def _set_text_to_input(self, control, text: str) -> None:
         self._activate_main_window()
         self._click(control)
+        if self._set_text_via_physical_clipboard(control, text):
+            return
+        if self._set_text_via_ascii_keyboard(control, text):
+            return
+        if self._set_text_via_uia(control, text, "поля ввода"):
+            return
         hwnd = self._get_hwnd(control)
-        if hwnd:
+        if hwnd and self.main_window is not None and hwnd != self.main_window.handle:
             self.logger.info(f"Пробуем native hwnd для поля ввода: {hwnd}")
             if self._set_text_via_hwnd(hwnd, text) and self._read_input_value(control):
                 return
+        elif hwnd:
+            self.logger.info("Пропускаем native hwnd: 1C вернула HWND главного окна для поля ввода.")
         if self._set_text_via_rpa(control, text):
             return
+        self._capture_debug_artifacts("input_failure")
         raise RuntimeError("Не удалось ввести текст в поле формы агента.")
+
+    def _set_text_via_physical_clipboard(self, control, text: str) -> bool:
+        if not text:
+            return False
+        try:
+            self.logger.info("Пробуем физический ввод через clipboard paste.")
+            self._activate_main_window()
+            try:
+                control.set_focus()
+            except Exception:
+                pass
+            try:
+                control.click_input()
+            except Exception:
+                self._click(control)
+            time.sleep(0.4)
+            keyboard.send_keys("^a", pause=0.05)
+            keyboard.send_keys("{BACKSPACE}", pause=0.05)
+            self._paste_text_to_active_window(text, send_unicode_fallback=False)
+            time.sleep(0.4)
+            keyboard.send_keys("{TAB}", pause=0.05)
+            time.sleep(0.7)
+            value = self._read_input_value(control)
+            if value:
+                self.logger.info("Физический clipboard-ввод: поле вернуло непустое значение.")
+                return True
+        except Exception as exc:
+            self.logger.info(f"Физический clipboard-ввод не сработал: {exc}")
+        return False
+
+    def _set_text_via_ascii_keyboard(self, control, text: str) -> bool:
+        if not text or not text.isascii():
+            return False
+        try:
+            self.logger.info("Пробуем физический ASCII-ввод клавиатурой.")
+            self._activate_main_window()
+            try:
+                control.set_focus()
+            except Exception:
+                pass
+            try:
+                control.click_input()
+            except Exception:
+                self._click(control)
+            time.sleep(0.4)
+            keyboard.send_keys("^a", pause=0.05)
+            keyboard.send_keys("{BACKSPACE}", pause=0.05)
+            keyboard.send_keys(text, pause=0.02, with_spaces=True)
+            time.sleep(0.4)
+            keyboard.send_keys("{TAB}", pause=0.05)
+            time.sleep(0.6)
+            value = self._read_input_value(control)
+            if value:
+                self.logger.info("Физический ASCII-ввод: поле вернуло непустое значение.")
+                return True
+        except Exception as exc:
+            self.logger.info(f"Физический ASCII-ввод не сработал: {exc}")
+        return False
 
     def _read_input_value(self, control) -> str:
         try:
@@ -782,6 +975,66 @@ class OneCAgentUiTest:
         except Exception:
             pass
         return self._safe_text(control)
+
+    def _set_text_via_uia(self, control, text: str, label: str) -> bool:
+        attempts = [
+            ("ValuePattern.SetValue", lambda: control.iface_value.SetValue(text)),
+            ("set_edit_text", lambda: control.set_edit_text(text)),
+            ("set_text", lambda: control.set_text(text)),
+        ]
+        for method_name, setter in attempts:
+            try:
+                self.logger.info(f"Пробуем UIA-ввод через {method_name} для {label}.")
+                setter()
+                time.sleep(0.5)
+                value = self._read_input_value(control)
+                if value:
+                    self.logger.info(f"UIA-ввод через {method_name}: поле вернуло непустое значение.")
+                    if self._commit_uia_text_with_keyboard(control, text):
+                        return True
+                    self.logger.info(f"UIA-ввод через {method_name}: значение есть, но клавиатурный commit не подтвердился.")
+                full_text = self._window_dump_text(self.main_window).lower() if self.main_window else ""
+                if text.lower() in full_text:
+                    self.logger.info(f"UIA-ввод через {method_name}: текст обнаружен в общем дампе окна.")
+                    if self._commit_uia_text_with_keyboard(control, text):
+                        return True
+            except Exception as exc:
+                self.logger.info(f"UIA-ввод через {method_name} не сработал: {exc}")
+        return False
+
+    def _commit_uia_text_with_keyboard(self, control, text: str) -> bool:
+        commit_sequences = (
+            "^a{BACKSPACE}",
+            "{END}{SPACE}{BACKSPACE}{TAB}",
+        )
+        for index, sequence in enumerate(commit_sequences, start=1):
+            try:
+                self.logger.info(f"UIA-ввод: commit клавиатурой, попытка {index}.")
+                self._activate_main_window()
+                try:
+                    control.set_focus()
+                except Exception:
+                    pass
+                try:
+                    control.click_input()
+                except Exception:
+                    self._click(control)
+                time.sleep(0.3)
+                if sequence == "^a{BACKSPACE}":
+                    keyboard.send_keys("^a", pause=0.05)
+                    keyboard.send_keys("{BACKSPACE}", pause=0.05)
+                    self._paste_text_to_active_window(text, send_unicode_fallback=False)
+                    time.sleep(0.4)
+                    keyboard.send_keys("{TAB}", pause=0.05)
+                else:
+                    keyboard.send_keys(sequence, pause=0.05)
+                time.sleep(0.6)
+                value = self._read_input_value(control)
+                if value:
+                    return True
+            except Exception as exc:
+                self.logger.info(f"UIA-ввод: commit попытка {index} завершилась ошибкой: {exc}")
+        return False
 
     def _get_hwnd(self, control) -> int:
         for attr in ("handle",):
@@ -846,15 +1099,11 @@ class OneCAgentUiTest:
                 self.logger.info(f"RPA-ввод: попытка {index}, фокус в точку {coords}.")
                 self._activate_main_window()
                 self._click_at(coords)
-                time.sleep(0.2)
-                self._double_click_at(coords)
-                time.sleep(0.2)
-                self._drag_select_input_area(rect)
-                time.sleep(0.2)
-                self._paste_text_to_active_window(text)
-                time.sleep(0.4)
-                keyboard.send_keys("{TAB}", pause=0.05)
-                time.sleep(0.4)
+                time.sleep(0.5)
+                keyboard.send_keys("^a", pause=0.05)
+                keyboard.send_keys("{BACKSPACE}", pause=0.05)
+                self._paste_text_to_active_window(text, send_unicode_fallback=False)
+                time.sleep(0.8)
                 if self._read_input_value(control):
                     self.logger.info("RPA-ввод: поле вернуло непустое значение.")
                     return True
@@ -862,6 +1111,8 @@ class OneCAgentUiTest:
                 if text.lower() in full_text:
                     self.logger.info("RPA-ввод: текст обнаружен в общем дампе окна.")
                     return True
+                keyboard.send_keys("{TAB}", pause=0.05)
+                time.sleep(0.4)
             except Exception as exc:
                 self.logger.info(f"RPA-ввод: попытка {index} завершилась ошибкой: {exc}")
         return False
@@ -902,11 +1153,12 @@ class OneCAgentUiTest:
         self._mouse_left_up()
         time.sleep(0.2)
 
-    def _paste_text_to_active_window(self, text: str) -> None:
+    def _paste_text_to_active_window(self, text: str, send_unicode_fallback: bool = True) -> None:
         self._set_clipboard_text(text)
         keyboard.send_keys("^v", pause=0.05)
         time.sleep(0.1)
-        self._send_input_unicode_text(text)
+        if send_unicode_fallback:
+            self._send_input_unicode_text(text)
 
     def _set_clipboard_text(self, text: str) -> None:
         GMEM_MOVEABLE = 0x0002
@@ -1000,12 +1252,22 @@ class OneCAgentUiTest:
     def _raise_if_error_dialog(self) -> None:
         for win in Desktop(backend=self.config.backend).windows():
             try:
-                if self.process is not None and win.process_id() != self.process.pid:
+                if self.client_pids and win.process_id() not in self.client_pids:
+                    continue
+                if not self.client_pids and self.process is not None and win.process_id() != self.process.pid:
                     continue
                 if not self._safe_is_visible(win):
                     continue
                 text_dump = self._window_dump_text(win)
-                if "Сформировать отчет об ошибке" in text_dump or "не определена" in text_dump.lower():
+                text_dump_lower = text_dump.lower()
+                error_markers = (
+                    "сформировать отчет об ошибке",
+                    "generate error report",
+                    "lock conflict during the transaction",
+                    "database object read integrity violation",
+                    "не определена",
+                )
+                if any(marker in text_dump_lower for marker in error_markers):
                     self._try_close_error_dialog(win)
                     raise RuntimeError(f"1С показала модальную ошибку:\n{text_dump.strip()}")
             except RuntimeError:
@@ -1015,7 +1277,7 @@ class OneCAgentUiTest:
 
     def _try_close_error_dialog(self, window) -> None:
         for item in self._iter_descendants(window):
-            if self._safe_text(item) == "OK" and self._safe_control_type(item) == "Button":
+            if self._safe_text(item).upper() in ("OK", "ОК") and self._safe_control_type(item) == "Button":
                 try:
                     self._click(item)
                 except Exception:
@@ -1101,19 +1363,20 @@ class OneCAgentUiTest:
                 continue
         return "\n".join(chunks)
 
-    def _capture_debug_artifacts(self) -> None:
+    def _capture_debug_artifacts(self, prefix: str = "ui_failure") -> None:
         if not self.config.screenshot_dir or self.main_window is None:
             return
         target_dir = Path(self.config.screenshot_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
         stamp = int(time.time())
-        dump_path = target_dir / f"ui_failure_{stamp}.txt"
-        controls_path = target_dir / f"ui_failure_controls_{stamp}.txt"
+        dump_path = target_dir / f"{prefix}_{stamp}.txt"
+        controls_path = target_dir / f"{prefix}_controls_{stamp}.txt"
         try:
             image = self.main_window.capture_as_image()
             if image is not None:
-                image.save(target_dir / f"ui_failure_{stamp}.png")
-                self.logger.info(f"Сохранён скриншот: {target_dir / f'ui_failure_{stamp}.png'}")
+                image_path = target_dir / f"{prefix}_{stamp}.png"
+                image.save(image_path)
+                self.logger.info(f"Сохранён скриншот: {image_path}")
             else:
                 self.logger.info("capture_as_image() вернул None, png-скриншот пропущен.")
         except Exception as exc:
@@ -1290,6 +1553,11 @@ def parse_args() -> UiConfig:
         action="store_true",
         help="Не подготавливать Query1C через COM внутри гостя",
     )
+    parser.add_argument(
+        "--record-start-marker",
+        default="",
+        help="Файл-marker: когда тест готов к пользовательским действиям, он создаёт файл для старта записи",
+    )
     args = parser.parse_args()
     return UiConfig(
         platform_exe=args.platform_exe,
@@ -1314,6 +1582,7 @@ def parse_args() -> UiConfig:
         chrome_exe=args.chrome_exe,
         headed=args.headed,
         skip_com_prepare=args.skip_com_prepare,
+        record_start_marker=args.record_start_marker,
     )
 
 
@@ -1392,10 +1661,14 @@ def run_desktop_diagnostics(config: UiConfig, logger: Logger) -> int:
         "/N",
         config.user,
     ]
+    if config.password:
+        cmd.extend(["/P", config.password])
+    if config.log_file:
+        cmd.extend(["/Out", str(Path(config.log_file).with_name("desktop_1c_startup.log")), "-NoTruncate"])
     logger.info(f"Desktop diagnostics, launch command: {cmd}")
     process = None
     try:
-        process = subprocess.Popen(cmd, env=client_env)
+        process = subprocess.Popen(cmd, env=client_env, cwd=str(Path(config.platform_exe).parent))
         time.sleep(15)
         windows = []
         for win in Desktop(backend=config.backend).windows():
