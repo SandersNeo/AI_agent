@@ -164,6 +164,12 @@ SCENARIO_RULES_BY_ID = {
         "max_errors": 24,
         "require_recovery": False,
         "require_zero_rows": False,
+        "forbidden_log_patterns": [
+            {
+                "pattern": r"Ошибка выполнения шага 'FindReferenceByName'[\s\S]{0,240}ТехноПром",
+                "reason": "Отчетная задача не должна обрываться на точном lookup значения фильтра",
+            },
+        ],
     },
     "stock_low": {
         "expect_success": True,
@@ -222,6 +228,16 @@ SCENARIO_RULES_BY_ID = {
         "max_errors": 36,
         "require_recovery": False,
         "require_zero_rows": False,
+        "forbidden_log_patterns": [
+            {
+                "pattern": r"ТЕКУЩАЯДАТА\s*\(",
+                "reason": "Явный RunQuery не должен содержать запрещенную функцию ТЕКУЩАЯДАТА()",
+            },
+            {
+                "pattern": r"Tool submit_dsl вернул JSON, но он не проходит проверку DSL",
+                "reason": "Контракт DSL должен восстанавливаться локально без ошибки сценария",
+            },
+        ],
     },
     "field_not_found_recovery": {
         "expect_success": True,
@@ -274,7 +290,7 @@ SCENARIO_RULES_BY_ID = {
         "require_zero_rows": False,
         "required_log_patterns_all": [
             {
-                "pattern": r"(?:\"columns\"\s*:\s*\[[^\]]*\"День\"[^\]]*\"Сумма\"|КАК\s+День[\s\S]{0,500}КАК\s+Сумма|группировк[^\n]{0,160}дн[^\n]{0,160}сум)",
+                "pattern": r"(?:\"columns\"\s*:\s*\[[^\]]*\"День\"[^\]]*\"Сумма\"|КАК\s+День[\s\S]{0,500}КАК\s+Сумма|колонки\(до10\)=['\"][^'\"]*День[^'\"]*Сумма|День\s*:[\s\S]{0,300}Сумма\s*:|группировк[^\n]{0,160}дн[^\n]{0,160}сум)",
                 "reason": "В результате/запросе должны быть бизнес-колонки День и Сумма",
                 "scope": "full_log",
             },
@@ -284,6 +300,10 @@ SCENARIO_RULES_BY_ID = {
             },
         ],
         "forbidden_log_patterns": [
+            {
+                "pattern": r"строк=0,\s*колонок=0|строк\s+0,\s*колонок\s+0",
+                "reason": "Пустой результат без колонок не является корректным выводом запроса",
+            },
             {
                 "pattern": r"ВЫБРАТЬ\s+1\s+КАК\s+(?:Н|Значение)\b",
                 "reason": "Обнаружен технический fallback-запрос вместо бизнес-запроса",
