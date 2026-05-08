@@ -1971,8 +1971,18 @@
 	План = ИИА_TypedPlan.ПолучитьTypedPlan(СсылкаДиалога);
 	ТекущийШаг = ИИА_TypedPlan.ПолучитьСледующийШагПлана(СсылкаДиалога);
 	Если ТекущийШаг = Неопределено Тогда
-		ПротоколироватьМетрикуСтадии(СсылкаДиалога, "Plan", НачалоPlan, Ложь, "no_pending_step", "Plan->Recover");
-		Результат.Reason = "no_pending_step";
+		Если ИИА_TypedPlan.ПланЗавершен(СсылкаДиалога) Тогда
+			ИИА_Сервер.ЗафиксироватьАктивныйПодграф(СсылкаДиалога, "PlanningSubgraph", "plan_completed_after_normalization");
+			ПротоколироватьМетрикуСтадии(СсылкаДиалога, "Plan", НачалоPlan, Истина, "plan_completed", "Plan->Summarize");
+			Результат.Успех = Истина;
+			Результат.Transition = "Plan->Summarize";
+			Результат.Decision = "continue";
+			Результат.NextStage = "Summarize";
+			Результат.Reason = "plan_completed";
+		Иначе
+			ПротоколироватьМетрикуСтадии(СсылкаДиалога, "Plan", НачалоPlan, Ложь, "no_pending_step", "Plan->Recover");
+			Результат.Reason = "no_pending_step";
+		КонецЕсли;
 		Возврат ИИА_RuntimeКонтракты.ПодготовитьРезультатПодграфаКВозврату(Результат);
 	КонецЕсли;
 	ПланJSON = СжатьJSONДляЛога(СериализоватьJSONЛокально(План));
