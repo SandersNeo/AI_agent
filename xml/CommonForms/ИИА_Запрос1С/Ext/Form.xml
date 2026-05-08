@@ -27,92 +27,102 @@
 			<ContextMenu name="СтатусКонтекстноеМеню" id="2"/>
 			<ExtendedTooltip name="СтатусРасширеннаяПодсказка" id="3"/>
 		</LabelField>
-		<InputField name="ТекстЗапроса" id="4">
-			<DataPath>ТекстЗапроса</DataPath>
+		<UsualGroup name="ГруппаЗапросИПараметры" id="29">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
-					<v8:content>Текст запроса</v8:content>
+					<v8:content>Запрос и параметры</v8:content>
 				</v8:item>
 			</Title>
-			<Height>8</Height>
+			<Height>10</Height>
 			<AutoMaxHeight>false</AutoMaxHeight>
 			<HorizontalStretch>true</HorizontalStretch>
-			<MultiLine>true</MultiLine>
-			<ContextMenu name="ТекстЗапросаКонтекстноеМеню" id="5"/>
-			<ExtendedTooltip name="ТекстЗапросаРасширеннаяПодсказка" id="6"/>
-			<Events>
-				<Event name="OnChange">ТекстЗапросаПриИзменении</Event>
-			</Events>
-		</InputField>
-		<Table name="ПараметрыЗапросаТаблица" id="7">
-			<Title>
-				<v8:item>
-					<v8:lang>ru</v8:lang>
-					<v8:content>Параметры запроса</v8:content>
-				</v8:item>
-			</Title>
-			<Representation>List</Representation>
-			<Height>8</Height>
-			<AutoMaxHeight>false</AutoMaxHeight>
-			<HorizontalStretch>true</HorizontalStretch>
-			<HorizontalLinesBWA>true</HorizontalLinesBWA>
-			<VerticalLinesBWA>true</VerticalLinesBWA>
-			<AutoInsertNewRow>true</AutoInsertNewRow>
-			<DataPath>ПараметрыЗапросаТаблица</DataPath>
-			<RowFilter xsi:nil="true"/>
-			<ContextMenu name="ПараметрыЗапросаТаблицаКонтекстноеМеню" id="8"/>
-			<AutoCommandBar name="ПараметрыЗапросаТаблицаКоманднаяПанель" id="9">
-				<Autofill>false</Autofill>
-			</AutoCommandBar>
-			<ExtendedTooltip name="ПараметрыЗапросаТаблицаРасширеннаяПодсказка" id="19"/>
+			<VerticalStretch>false</VerticalStretch>
+			<Group>AlwaysHorizontal</Group>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ГруппаЗапросИПараметрыРасширеннаяПодсказка" id="30"/>
 			<ChildItems>
-				<InputField name="ПараметрыЗапросаТаблицаИмяПараметра" id="20">
-					<DataPath>ПараметрыЗапросаТаблица.ИмяПараметра</DataPath>
-					<EditMode>EnterOnInput</EditMode>
-					<Width>20</Width>
-					<ContextMenu name="ПараметрыЗапросаТаблицаИмяПараметраКонтекстноеМеню" id="21"/>
-					<ExtendedTooltip name="ПараметрыЗапросаТаблицаИмяПараметраРасширеннаяПодсказка" id="22"/>
+				<InputField name="ТекстЗапроса" id="4">
+					<DataPath>ТекстЗапроса</DataPath>
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Текст запроса</v8:content>
+						</v8:item>
+					</Title>
+					<Width>60</Width>
+					<Height>10</Height>
+					<AutoMaxHeight>false</AutoMaxHeight>
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<MultiLine>true</MultiLine>
+					<ContextMenu name="ТекстЗапросаКонтекстноеМеню" id="5"/>
+					<ExtendedTooltip name="ТекстЗапросаРасширеннаяПодсказка" id="6"/>
 					<Events>
-						<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+						<Event name="OnChange">ТекстЗапросаПриИзменении</Event>
 					</Events>
 				</InputField>
-				<InputField name="ПараметрыЗапросаТаблицаТипПараметра" id="23">
-					<DataPath>ПараметрыЗапросаТаблица.ТипПараметра</DataPath>
-					<EditMode>EnterOnInput</EditMode>
-					<Width>12</Width>
-					<ContextMenu name="ПараметрыЗапросаТаблицаТипПараметраКонтекстноеМеню" id="24"/>
-					<ExtendedTooltip name="ПараметрыЗапросаТаблицаТипПараметраРасширеннаяПодсказка" id="25"/>
-					<Events>
-						<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
-					</Events>
-				</InputField>
-				<InputField name="ПараметрыЗапросаТаблицаЗначениеПараметра" id="26">
-					<DataPath>ПараметрыЗапросаТаблица.ЗначениеПараметра</DataPath>
-					<EditMode>EnterOnInput</EditMode>
-					<Width>30</Width>
-					<ContextMenu name="ПараметрыЗапросаТаблицаЗначениеПараметраКонтекстноеМеню" id="27"/>
-					<ExtendedTooltip name="ПараметрыЗапросаТаблицаЗначениеПараметраРасширеннаяПодсказка" id="28"/>
-					<Events>
-						<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
-					</Events>
-				</InputField>
+				<Table name="ПараметрыЗапросаТаблица" id="7">
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Параметры запроса</v8:content>
+						</v8:item>
+					</Title>
+					<Representation>List</Representation>
+					<Width>80</Width>
+					<Height>10</Height>
+					<AutoMaxHeight>false</AutoMaxHeight>
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<HorizontalLinesBWA>true</HorizontalLinesBWA>
+					<VerticalLinesBWA>true</VerticalLinesBWA>
+					<AutoInsertNewRow>true</AutoInsertNewRow>
+					<DataPath>ПараметрыЗапросаТаблица</DataPath>
+					<RowFilter xsi:nil="true"/>
+					<ContextMenu name="ПараметрыЗапросаТаблицаКонтекстноеМеню" id="8"/>
+					<AutoCommandBar name="ПараметрыЗапросаТаблицаКоманднаяПанель" id="9">
+						<Autofill>false</Autofill>
+					</AutoCommandBar>
+					<ExtendedTooltip name="ПараметрыЗапросаТаблицаРасширеннаяПодсказка" id="19"/>
+					<ChildItems>
+						<InputField name="ПараметрыЗапросаТаблицаИмяПараметра" id="20">
+							<DataPath>ПараметрыЗапросаТаблица.ИмяПараметра</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<Width>20</Width>
+							<ContextMenu name="ПараметрыЗапросаТаблицаИмяПараметраКонтекстноеМеню" id="21"/>
+							<ExtendedTooltip name="ПараметрыЗапросаТаблицаИмяПараметраРасширеннаяПодсказка" id="22"/>
+							<Events>
+								<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<InputField name="ПараметрыЗапросаТаблицаТипПараметра" id="23">
+							<DataPath>ПараметрыЗапросаТаблица.ТипПараметра</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<Width>12</Width>
+							<ContextMenu name="ПараметрыЗапросаТаблицаТипПараметраКонтекстноеМеню" id="24"/>
+							<ExtendedTooltip name="ПараметрыЗапросаТаблицаТипПараметраРасширеннаяПодсказка" id="25"/>
+							<Events>
+								<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<InputField name="ПараметрыЗапросаТаблицаЗначениеПараметра" id="26">
+							<DataPath>ПараметрыЗапросаТаблица.ЗначениеПараметра</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<Width>30</Width>
+							<ContextMenu name="ПараметрыЗапросаТаблицаЗначениеПараметраКонтекстноеМеню" id="27"/>
+							<ExtendedTooltip name="ПараметрыЗапросаТаблицаЗначениеПараметраРасширеннаяПодсказка" id="28"/>
+							<Events>
+								<Event name="OnChange">ПараметрЗапросаПриИзменении</Event>
+							</Events>
+						</InputField>
+					</ChildItems>
+				</Table>
 			</ChildItems>
-		</Table>
-		<Button name="ВыполнитьКнопка" id="14">
-			<Type>UsualButton</Type>
-			<CommandName>Form.Command.Выполнить</CommandName>
-			<HorizontalStretch>false</HorizontalStretch>
-			<ExtendedTooltip name="ВыполнитьКнопкаРасширеннаяПодсказка" id="15"/>
-		</Button>
-		<Button name="ОткрытьТабличныйДокументРезультата" id="29">
-			<Type>UsualButton</Type>
-			<CommandName>Form.Command.ОткрытьТабличныйДокументРезультата</CommandName>
-			<HorizontalStretch>false</HorizontalStretch>
-			<ExtendedTooltip name="ОткрытьТабличныйДокументРезультатаРасширеннаяПодсказка" id="30"/>
-		</Button>
-		<InputField name="РезультатЗапроса" id="16">
-			<DataPath>РезультатЗапроса</DataPath>
+		</UsualGroup>
+		<SpreadSheetDocumentField name="РезультатТабличныйДокумент" id="16">
+			<DataPath>РезультатТабличныйДокумент</DataPath>
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
@@ -123,11 +133,11 @@
 			<AutoMaxHeight>false</AutoMaxHeight>
 			<HorizontalStretch>true</HorizontalStretch>
 			<VerticalStretch>true</VerticalStretch>
-			<MultiLine>true</MultiLine>
-			<ReadOnly>true</ReadOnly>
-			<ContextMenu name="РезультатЗапросаКонтекстноеМеню" id="17"/>
-			<ExtendedTooltip name="РезультатЗапросаРасширеннаяПодсказка" id="18"/>
-		</InputField>
+			<VerticalScrollBar>true</VerticalScrollBar>
+			<HorizontalScrollBar>true</HorizontalScrollBar>
+			<ContextMenu name="РезультатТабличныйДокументКонтекстноеМеню" id="17"/>
+			<ExtendedTooltip name="РезультатТабличныйДокументРасширеннаяПодсказка" id="18"/>
+		</SpreadSheetDocumentField>
 	</ChildItems>
 	<Attributes>
 		<Attribute name="СсылкаДиалога" id="1">
@@ -225,6 +235,11 @@
 				<v8:Type>xs:boolean</v8:Type>
 			</Type>
 		</Attribute>
+		<Attribute name="РезультатТабличныйДокумент" id="8">
+			<Type>
+				<v8:Type xmlns:mxl="http://v8.1c.ru/8.2/data/spreadsheet">mxl:SpreadsheetDocument</v8:Type>
+			</Type>
+		</Attribute>
 		<Attribute name="Статус" id="5">
 			<Type>
 				<v8:Type>xs:string</v8:Type>
@@ -253,15 +268,6 @@
 				</v8:item>
 			</Title>
 			<Action>ЗакрытьФорму</Action>
-		</Command>
-		<Command name="ОткрытьТабличныйДокументРезультата" id="3">
-			<Title>
-				<v8:item>
-					<v8:lang>ru</v8:lang>
-					<v8:content>Открыть таблицу результата</v8:content>
-				</v8:item>
-			</Title>
-			<Action>ОткрытьТабличныйДокументРезультатаКоманда</Action>
 		</Command>
 	</Commands>
 </Form>
