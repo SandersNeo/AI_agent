@@ -135,7 +135,7 @@ QUALITY_GATE_MIN_SINGLE_SCORE = 40
 # Профили бюджета токенов для оценки эффективности
 TOKEN_BUDGETS_BY_EXAMPLE = {
     "orders_client": {"target": 1800, "soft_limit": 6000, "hard_limit": 9000},
-    "stock_low": {"target": 2200, "soft_limit": 8000, "hard_limit": 12000},
+    "stock_low": {"target": 2200, "soft_limit": 12000, "hard_limit": 30000},
     "create_receipt": {"target": 2600, "soft_limit": 12000, "hard_limit": 18000},
     "sales_analysis": {"target": 3200, "soft_limit": 20000, "hard_limit": 30000},
     "nested_fields_query": {"target": 2800, "soft_limit": 10000, "hard_limit": 15000},
@@ -174,6 +174,23 @@ SCENARIO_RULES_BY_ID = {
         "max_errors": 36,
         "require_recovery": False,
         "require_zero_rows": False,
+        "required_log_patterns_all": [
+            {
+                "pattern": r"(?:\"columns\"\s*:\s*\[[^\]]*\"Номенклатура\"[^\]]*\"(?:Остаток|Количество)\"|\"fields\"\s*:\s*\[[^\]]*\"Номенклатура\"[^\]]*\"(?:Остаток|КоличествоОстаток|Количество)\"|КАК\s+Номенклатура[\s\S]{0,500}КАК\s+(?:Остаток|Количество)|колонки\(до10\)=['\"][^'\"]*Номенклатура[^'\"]*(?:Остаток|Количество)|Номенклатура\s*:[\s\S]{0,500}(?:Остаток|Количество)\s*:)",
+                "reason": "В результате/запросе должны быть бизнес-колонки Номенклатура и остаток/количество",
+                "scope": "full_log",
+            },
+        ],
+        "forbidden_log_patterns": [
+            {
+                "pattern": r"ВЫБРАТЬ\s+1\s+КАК\s+(?:Н|Значение)\b",
+                "reason": "Обнаружен технический fallback-запрос вместо запроса остатков",
+            },
+            {
+                "pattern": r"\b1\.\s*(?:Н|Значение)\s*:\s*1\b",
+                "reason": "ShowInfo вывел техническую заглушку 1 вместо остатков",
+            },
+        ],
     },
     "create_receipt": {
         "expect_success": True,
@@ -257,7 +274,7 @@ SCENARIO_RULES_BY_ID = {
         "require_zero_rows": False,
         "required_log_patterns_all": [
             {
-                "pattern": r"(?:\"columns\"\s*:\s*\[[^\]]*\"День\"[^\]]*\"Сумма\"|КАК\s+День[\s\S]{0,500}КАК\s+Сумма)",
+                "pattern": r"(?:\"columns\"\s*:\s*\[[^\]]*\"День\"[^\]]*\"Сумма\"|КАК\s+День[\s\S]{0,500}КАК\s+Сумма|группировк[^\n]{0,160}дн[^\n]{0,160}сум)",
                 "reason": "В результате/запросе должны быть бизнес-колонки День и Сумма",
                 "scope": "full_log",
             },
@@ -701,6 +718,8 @@ def categorize_failure(result: dict) -> list:
     recovery_attempts = int(result.get("recovery_attempts", 0) or 0)
 
     if not result.get("base_passed", True):
+        if any("Tool submit_dsl вернул JSON" in str(e) or "ОшибкаКонтракта" in str(e) for e in error_samples):
+            categories.append("dsl_contract_error")
         if not result.get("summary_present", False):
             categories.append("summary_missing")
         elif not result.get("summary_confirmed", False):

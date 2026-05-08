@@ -18,6 +18,7 @@
 	</AutoCommandBar>
 	<Events>
 		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+		<Event name="OnOpen">ПриОткрытии</Event>
 	</Events>
 	<ChildItems>
 		<LabelField name="Статус" id="1">
@@ -103,6 +104,12 @@
 			<CommandName>Form.Command.Выполнить</CommandName>
 			<HorizontalStretch>false</HorizontalStretch>
 			<ExtendedTooltip name="ВыполнитьКнопкаРасширеннаяПодсказка" id="15"/>
+		</Button>
+		<Button name="ОткрытьТабличныйДокументРезультата" id="29">
+			<Type>UsualButton</Type>
+			<CommandName>Form.Command.ОткрытьТабличныйДокументРезультата</CommandName>
+			<HorizontalStretch>false</HorizontalStretch>
+			<ExtendedTooltip name="ОткрытьТабличныйДокументРезультатаРасширеннаяПодсказка" id="30"/>
 		</Button>
 		<InputField name="РезультатЗапроса" id="16">
 			<DataPath>РезультатЗапроса</DataPath>
@@ -213,6 +220,11 @@
 				</v8:StringQualifiers>
 			</Type>
 		</Attribute>
+		<Attribute name="ЕстьРезультатЗапроса" id="7">
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
 		<Attribute name="Статус" id="5">
 			<Type>
 				<v8:Type>xs:string</v8:Type>
@@ -241,6 +253,15 @@
 				</v8:item>
 			</Title>
 			<Action>ЗакрытьФорму</Action>
+		</Command>
+		<Command name="ОткрытьТабличныйДокументРезультата" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Открыть таблицу результата</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ОткрытьТабличныйДокументРезультатаКоманда</Action>
 		</Command>
 	</Commands>
 </Form>
