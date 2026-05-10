@@ -38,6 +38,8 @@ from com_1c import connect_to_1c, call_procedure, get_enum_value
 from com_1c.com_connector import setup_console_encoding
 from com_1c.config import get_connection_string
 
+DEFAULT_TELEGRAM_PROXY_URL = "http://192.168.2.124:10808"
+
 # Загрузка .env для Telegram
 try:
     from dotenv import load_dotenv
@@ -354,6 +356,7 @@ def send_telegram_notification(message: str) -> bool:
     if not token or not chat_id:
         return False
     try:
+        proxy_url = os.environ.get("TELEGRAM_PROXY_URL") or DEFAULT_TELEGRAM_PROXY_URL
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         data = urllib.parse.urlencode({
             "chat_id": chat_id,
@@ -363,7 +366,10 @@ def send_telegram_notification(message: str) -> bool:
         }).encode("utf-8")
         req = urllib.request.Request(url, data=data, method="POST")
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+        ) if proxy_url else urllib.request.build_opener()
+        with opener.open(req, timeout=20) as resp:
             return resp.status == 200
     except Exception:
         return False

@@ -19,6 +19,8 @@ try:
 except ImportError:
     pass
 
+DEFAULT_TELEGRAM_PROXY_URL = "http://192.168.2.124:10808"
+
 
 def _get_token_chat():
     """Возвращает (token, chat_id) или (None, None)."""
@@ -37,7 +39,11 @@ def _api_request(token: str, method: str, data: dict = None) -> dict:
     else:
         req = urllib.request.Request(url, method="GET")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    with urllib.request.urlopen(req, timeout=35) as resp:
+    proxy_url = os.environ.get("TELEGRAM_PROXY_URL") or DEFAULT_TELEGRAM_PROXY_URL
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+    ) if proxy_url else urllib.request.build_opener()
+    with opener.open(req, timeout=35) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
