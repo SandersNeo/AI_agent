@@ -11,6 +11,10 @@ param(
     [string]$SharePassword = "",
     [string]$TestCase = "standard",
     [string]$Prompt = "",
+    [string]$DialogType = "Запрос1С",
+    [string]$FollowupsJson = "[]",
+    [switch]$ShowQueryBetweenTurns,
+    [switch]$MouseControl,
     [string]$ExpectedText = "",
     [int]$RecordDurationSec = 0,
     [int]$RecordWidth = 1600,
@@ -20,6 +24,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$env:PSModulePath = @(
+    Join-Path $HOME "Documents\WindowsPowerShell\Modules"
+    Join-Path $env:ProgramFiles "WindowsPowerShell\Modules"
+    Join-Path $env:SystemRoot "system32\WindowsPowerShell\v1.0\Modules"
+) -join ";"
+Import-Module Microsoft.PowerShell.Security -ErrorAction Stop
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $securePassword = ConvertTo-SecureString $Password -AsPlainText -Force
@@ -35,7 +45,7 @@ try {
     Copy-Item -ToSession $session -Path (Join-Path $repoRoot "automation\ui\ui_1c_agent_test.py") -Destination "C:\Work\AI_agent\automation\ui\ui_1c_agent_test.py" -Force
     Copy-Item -ToSession $session -Path (Join-Path $repoRoot "automation\ui\run_with_screen_recording.ps1") -Destination "C:\Work\AI_agent\automation\ui\run_with_screen_recording.ps1" -Force
 
-    Invoke-Command -Session $session -ArgumentList $guestVideoPath, $guestStdoutPath, $PlatformExe, $BasePath, $ShareRoot, $ShareUser, $SharePassword, $defaultBaseSubPath, $TestCase, $Prompt, $ExpectedText, $TimeoutSec, $RecordDurationSec, $RecordWidth, $RecordHeight, $TaskUser, $TaskPassword, $WindowsCompatible.IsPresent -ScriptBlock {
+    Invoke-Command -Session $session -ArgumentList $guestVideoPath, $guestStdoutPath, $PlatformExe, $BasePath, $ShareRoot, $ShareUser, $SharePassword, $defaultBaseSubPath, $TestCase, $Prompt, $DialogType, $FollowupsJson, $ShowQueryBetweenTurns.IsPresent, $MouseControl.IsPresent, $ExpectedText, $TimeoutSec, $RecordDurationSec, $RecordWidth, $RecordHeight, $TaskUser, $TaskPassword, $WindowsCompatible.IsPresent -ScriptBlock {
         param(
             [string]$VideoPath,
             [string]$StdoutPath,
@@ -47,6 +57,10 @@ try {
             [string]$TargetDefaultBaseSubPath,
             [string]$TargetTestCase,
             [string]$TargetPrompt,
+            [string]$TargetDialogType,
+            [string]$TargetFollowupsJson,
+            [bool]$TargetShowQueryBetweenTurns,
+            [bool]$TargetMouseControl,
             [string]$TargetExpectedText,
             [int]$TargetTestTimeoutSec,
             [int]$TargetRecordDurationSec,
@@ -64,6 +78,7 @@ try {
         Remove-Item C:\AIAgent\desktop_1c_startup.log -Force -ErrorAction SilentlyContinue
         Remove-Item C:\AIAgent\desktop_1c_record_start.marker -Force -ErrorAction SilentlyContinue
         Remove-Item C:\AIAgent\desktop_1c_artifacts\* -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item C:\Work\AI_agent\automation\ui\__pycache__ -Recurse -Force -ErrorAction SilentlyContinue
         Get-Process 1cv8,1cv8c,1cv8s -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
         if ([string]::IsNullOrWhiteSpace($TargetBasePath)) {
@@ -116,9 +131,12 @@ public static class Win32Window {
         }
 
         function ConvertTo-PsSingleQuotedLiteral([string]$Value) {
-            "'" + $Value.Replace("'", "''") + "'"
+            return ("'" + $Value.Replace("'", "''") + "'")
         }
 
+        $followupsJsonBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($TargetFollowupsJson))
+        $showQueryBetweenTurnsLiteral = if ($TargetShowQueryBetweenTurns) { '$true' } else { '$false' }
+        $mouseControlLiteral = if ($TargetMouseControl) { '$true' } else { '$false' }
         $innerScriptPath = "C:\AIAgent\run_desktop_1c_ffmpeg_inner.ps1"
         @(
             '$ErrorActionPreference = "Continue"',
@@ -129,6 +147,10 @@ public static class Win32Window {
             '$targetBasePath = ' + (ConvertTo-PsSingleQuotedLiteral $TargetBasePath),
             '$targetShareUser = ' + (ConvertTo-PsSingleQuotedLiteral $TargetShareUser),
             '$targetSharePassword = ' + (ConvertTo-PsSingleQuotedLiteral $TargetSharePassword),
+            '$followupsPath = "C:\AIAgent\desktop_1c_followups.json"',
+            '$followupsB64 = ''' + $followupsJsonBase64 + '''',
+            '[System.IO.File]::WriteAllBytes($followupsPath, [Convert]::FromBase64String($followupsB64))',
+            'Remove-Item C:\Work\AI_agent\automation\ui\__pycache__ -Recurse -Force -ErrorAction SilentlyContinue',
             '"TaskShareRoot=$targetShareRoot" | Out-File $shareLog -Encoding UTF8 -Append',
             '"TaskBasePath=$targetBasePath" | Out-File $shareLog -Encoding UTF8 -Append',
             'cmd.exe /c "net use ""$targetShareRoot"" /delete /y >nul 2>nul"',
@@ -139,15 +161,20 @@ public static class Win32Window {
             "    `"--platform-exe`", `"$TargetPlatformExe`",",
             "    `"--base-path`", `"$TargetBasePath`",",
             "    `"--test-case`", `"$TargetTestCase`",",
+            '    "--dialog-type", ' + (ConvertTo-PsSingleQuotedLiteral $TargetDialogType) + ',',
             '    "--timeout-sec", ' + (ConvertTo-PsSingleQuotedLiteral ([string]$TargetTestTimeoutSec)) + ',',
             '    "--startup-timeout-sec", "120",',
             '    "--backend", "uia",',
             '    "--log-file", "C:\AIAgent\desktop_1c_test.log",',
             '    "--screenshot-dir", "C:\AIAgent\desktop_1c_artifacts",',
-            '    "--record-start-marker", "C:\AIAgent\desktop_1c_record_start.marker"',
+            '    "--record-start-marker", "C:\AIAgent\desktop_1c_record_start.marker",',
+            '    "--followups-file", $followupsPath',
             ')',
+            'if (' + $showQueryBetweenTurnsLiteral + ') { $testArgs += @("--show-query-between-turns") }',
+            'if (' + $mouseControlLiteral + ') { $testArgs += @("--mouse-control") }',
             'if (-not [string]::IsNullOrWhiteSpace(' + (ConvertTo-PsSingleQuotedLiteral $TargetPrompt) + ')) { $testArgs += @("--prompt", ' + (ConvertTo-PsSingleQuotedLiteral $TargetPrompt) + ') }',
             'if (-not [string]::IsNullOrWhiteSpace(' + (ConvertTo-PsSingleQuotedLiteral $TargetExpectedText) + ')) { $testArgs += @("--expected-text", ' + (ConvertTo-PsSingleQuotedLiteral $TargetExpectedText) + ') }',
+            '$testArgs | Out-File C:\AIAgent\desktop_1c_args.txt -Encoding UTF8',
             '& C:\Python\python.exe @testArgs *> C:\AIAgent\desktop_1c_ffmpeg_inner_stdout.log',
             'exit $LASTEXITCODE'
         ) | Set-Content -Path $innerScriptPath -Encoding UTF8
@@ -183,7 +210,8 @@ public static class Win32Window {
         Start-Process -FilePath "schtasks.exe" -ArgumentList $runArgs -WindowStyle Hidden -Wait -RedirectStandardOutput "C:\AIAgent\schtasks_run_stdout.log" -RedirectStandardError "C:\AIAgent\schtasks_run_stderr.log"
     }
 
-    $deadline = (Get-Date).AddSeconds($TimeoutSec + 300)
+    $runSubmittedAt = Get-Date
+    $deadline = $runSubmittedAt.AddSeconds($TimeoutSec + 300)
     do {
         Start-Sleep -Seconds 5
         $state = Invoke-Command -Session $session -ScriptBlock {
@@ -192,9 +220,11 @@ public static class Win32Window {
             [pscustomobject]@{
                 State = if ($task) { [string]$task.State } else { "Missing" }
                 LastTaskResult = if ($info) { [int64]$info.LastTaskResult } else { $null }
+                LastRunTime = if ($info) { [datetime]$info.LastRunTime } else { [datetime]::MinValue }
             }
         }
-        if ($state.State -ne "Running" -and $state.LastTaskResult -ne 267009) {
+        $taskStartedThisRun = $state.LastRunTime -ge $runSubmittedAt.AddSeconds(-2)
+        if ($taskStartedThisRun -and $state.State -ne "Running" -and $state.LastTaskResult -ne 267009) {
             break
         }
     } while ((Get-Date) -lt $deadline)

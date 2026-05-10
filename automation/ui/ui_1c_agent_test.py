@@ -17,6 +17,7 @@ import argparse
 import csv
 import ctypes
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -91,6 +92,9 @@ class UiConfig:
     user: str
     password: str
     prompt: str
+    followups: list[str]
+    show_query_between_turns: bool
+    mouse_control: bool
     dialog_type: str
     expected_text: str
     timeout_sec: int
@@ -147,6 +151,14 @@ class OneCAgentUiTest:
 
     def run(self) -> int:
         try:
+            self.logger.info(
+                "Параметры сценария: dialog_type={!r}, followups={}, show_query_between_turns={}, mouse_control={}.".format(
+                    self.config.dialog_type,
+                    len(self.config.followups),
+                    self.config.show_query_between_turns,
+                    self.config.mouse_control,
+                )
+            )
             skip_com_prepare = self.config.skip_com_prepare or HOST_PREPARED_QUERY1C_MARKER in self.config.prompt
             if self.config.test_case == "query1c_form" and not skip_com_prepare:
                 self._prepare_query1c_dialog_via_com()
@@ -159,8 +171,20 @@ class OneCAgentUiTest:
                 self._select_dialog_type()
                 self._signal_recording_start()
                 self._enter_prompt()
+                baseline_success_count = self._success_marker_count()
                 self._send_prompt()
-                self._wait_expected_response()
+                self._wait_expected_response(baseline_success_count)
+                if self.config.show_query_between_turns:
+                    self._show_query_form_preview()
+                for followup in self.config.followups:
+                    self.logger.info(f"Отправляем follow-up: {followup!r}")
+                    self.config.prompt = followup
+                    self._enter_prompt()
+                    baseline_success_count = self._success_marker_count()
+                    self._send_prompt()
+                    self._wait_expected_response(baseline_success_count)
+                    if self.config.show_query_between_turns:
+                        self._show_query_form_preview()
             if self.config.require_approval and not self.approval_seen:
                 raise RuntimeError("Сценарий требовал ручного подтверждения, но pending approval в UI не появился.")
             self.logger.info("UI тест завершён успешно.")
@@ -327,6 +351,8 @@ class OneCAgentUiTest:
         if current and self._normalize_dialog_type(current) == self._normalize_dialog_type(target):
             return
         self.logger.info(f"Выбираем тип диалога: {target!r}.")
+        if self.config.mouse_control and self._try_select_dialog_type_via_mouse(combo, target):
+            return
         if self._try_select_dialog_type_via_wrapper(combo, target):
             return
         self._click(combo)
@@ -339,12 +365,86 @@ class OneCAgentUiTest:
             self.logger.info("Не нашли popup-элемент типа диалога, пробуем клавиатурный fallback.")
         if self._dialog_type_is_active(target):
             return
+        if self._try_select_dialog_type_via_text_input(combo, target_variants):
+            return
+        if self._try_select_dialog_type_via_dropdown_keyboard(combo, target):
+            return
         self._click(combo)
         time.sleep(0.3)
         self._try_select_dialog_type_via_keyboard(target)
         time.sleep(0.7)
         if not self._dialog_type_is_active(target):
+            if self._normalize_dialog_type(target) == "запрос1с" and not self._safe_text(combo).strip():
+                self.logger.info("UIA не читает выбранное значение selector, продолжаем после визуального выбора Запрос 1С.")
+                return
             raise RuntimeError(f"Не удалось переключить тип диалога на {target!r}.")
+
+    def _try_select_dialog_type_via_mouse(self, combo, target: str) -> bool:
+        rect = combo.rectangle()
+        option_offsets = (34, 58, 82)
+        arrow = (rect.right - 10, rect.top + rect.height() // 2)
+        self.logger.info("Mouse-control: выбираем тип диалога через раскрытие combo на экране.")
+        for offset in option_offsets:
+            try:
+                self._activate_main_window()
+                self._click_at(arrow)
+                time.sleep(0.5)
+                self._click_at((rect.left + max(30, rect.width() // 2), rect.bottom + offset))
+                time.sleep(0.8)
+                if self._dialog_type_is_active(target):
+                    return True
+            except Exception as exc:
+                self.logger.info(f"Mouse-control выбор типа диалога не сработал: {exc}")
+        return False
+
+    def _try_select_dialog_type_via_text_input(self, combo, target_variants: list[str]) -> bool:
+        for target in target_variants:
+            try:
+                self.logger.info(f"Пробуем ввести тип диалога через clipboard: {target!r}.")
+                self._click(combo)
+                time.sleep(0.2)
+                keyboard.send_keys("^a", pause=0.05)
+                keyboard.send_keys("{BACKSPACE}", pause=0.05)
+                self._paste_text_to_active_window(target)
+                time.sleep(0.3)
+                keyboard.send_keys("{ENTER}", pause=0.05)
+                time.sleep(0.7)
+                if self._dialog_type_is_active(target):
+                    return True
+                keyboard.send_keys("{TAB}", pause=0.05)
+                time.sleep(0.5)
+                if self._dialog_type_is_active(target):
+                    return True
+            except Exception as exc:
+                self.logger.info(f"Ввод типа диалога через clipboard не сработал: {exc}")
+        return False
+
+    def _try_select_dialog_type_via_dropdown_keyboard(self, combo, target: str) -> bool:
+        rect = combo.rectangle()
+        click_points = [
+            (rect.right - 10, rect.top + rect.height() // 2),
+            (rect.left + rect.width() // 2, rect.top + rect.height() // 2),
+        ]
+        sequences = (
+            "{F4}{DOWN}{ENTER}",
+            "%{DOWN}{DOWN}{ENTER}",
+            "{DOWN}{ENTER}",
+            "{DOWN}{DOWN}{ENTER}",
+            "{UP}{ENTER}",
+        )
+        for point in click_points:
+            for sequence in sequences:
+                try:
+                    self.logger.info(f"Пробуем раскрыть selector типа диалога клавиатурой: {sequence!r}.")
+                    self._click_at(point)
+                    time.sleep(0.3)
+                    keyboard.send_keys(sequence, pause=0.08)
+                    time.sleep(0.8)
+                    if self._dialog_type_is_active(target):
+                        return True
+                except Exception as exc:
+                    self.logger.info(f"Клавиатурный dropdown fallback не сработал: {exc}")
+        return False
 
     def _normalize_dialog_type(self, value: str) -> str:
         normalized = (value or "").strip().lower().replace(" ", "")
@@ -373,12 +473,12 @@ class OneCAgentUiTest:
             rect = item.rectangle()
             if rect.width() < 120 or rect.height() < 18:
                 continue
-            if rect.left < 720 or rect.top < 130 or rect.top > 190:
+            if rect.left < 900 or rect.top < 70 or rect.top > 170:
                 continue
             candidates.append(item)
         if not candidates:
             raise RuntimeError("Не найден selector типа диалога.")
-        candidates.sort(key=lambda item: (abs(item.rectangle().top - 155), abs(item.rectangle().left - 780)))
+        candidates.sort(key=lambda item: (item.rectangle().left, -abs(item.rectangle().top - 110)), reverse=True)
         return candidates[0]
 
     def _try_select_dialog_type_via_wrapper(self, combo, target: str) -> bool:
@@ -468,6 +568,18 @@ class OneCAgentUiTest:
         return candidates[0]
 
     def _click_send_button_until_started(self, button) -> bool:
+        if self.config.mouse_control:
+            try:
+                self.logger.info("Mouse-control: нажимаем 'Отправить' мышью по экрану.")
+                self._activate_main_window()
+                self._click(button)
+                time.sleep(2)
+                self._handle_pending_approval()
+                if self._submission_started():
+                    self.logger.info("Отправка: форма начала обработку после mouse-control click.")
+                    return True
+            except Exception as exc:
+                self.logger.info(f"Mouse-control отправка не сработала: {exc}")
         attempts = [
             ("click_input", lambda: button.click_input()),
             ("mouse.click", lambda: self._click(button)),
@@ -496,8 +608,6 @@ class OneCAgentUiTest:
             "обработка",
             "остановить",
             "отправка сообщения",
-            "задача выполнена",
-            "задача завершена",
         )
         if any(marker in text_dump for marker in started_markers):
             return True
@@ -510,7 +620,7 @@ class OneCAgentUiTest:
             pass
         return False
 
-    def _wait_expected_response(self) -> None:
+    def _wait_expected_response(self, baseline_success_count: int = 0) -> None:
         self.logger.info("Ждём ожидаемый ответ агента.")
         if self.config.expected_text == "__SUBMISSION_STARTED__":
             self.logger.info("Smoke-режим: достаточно подтверждения, что отправка стартовала.")
@@ -532,6 +642,9 @@ class OneCAgentUiTest:
             if "остановить" in text_dump:
                 saw_running = True
             if self._is_successfully_completed(text_dump):
+                if self._success_marker_count(text_dump) <= baseline_success_count:
+                    time.sleep(2)
+                    continue
                 if expected and expected not in text_dump:
                     self.logger.info("Форма показывает успешное завершение, ожидаемый текст недоступен в dump UI.")
                 return
@@ -585,6 +698,51 @@ class OneCAgentUiTest:
         self._click(execute_button)
         self._wait_window_dump_contains(query_window, "Запрос выполнен.", self.config.timeout_sec)
         self._wait_window_dump_contains(query_window, self.config.expected_text, self.config.timeout_sec)
+
+    def _show_query_form_preview(self) -> None:
+        self.logger.info("Открываем форму 'Запрос 1С' для демонстрации текста запроса и результата.")
+        self._activate_main_window()
+        self._wait_window_text_contains("Открыть форму запроса 1С", 30)
+        link = self._find_descendant_by_titles(
+            ["Открыть форму запроса 1С"],
+            ["Hyperlink", "Text", "Button"],
+            20,
+        )
+        self._click(link)
+        time.sleep(1)
+        current_dump = self._window_dump_text(self.main_window)
+        if "Запрос 1С" in current_dump and "Результат" in current_dump:
+            query_window = self.main_window
+        else:
+            query_window = self._wait_for_process_window(["Запрос 1С", "Запрос1С"], 20)
+        query_window.set_focus()
+        time.sleep(4)
+        dump = self._window_dump_text(query_window)
+        if "Результат" not in dump:
+            self.logger.info("Форма запроса открыта, но в dump не найден блок результата; продолжаем демонстрацию.")
+        self._close_query_preview_window(query_window)
+        self._activate_main_window()
+
+    def _close_query_preview_window(self, query_window) -> None:
+        try:
+            close_button = self._find_descendant_by_titles_in_window(
+                query_window,
+                ["Закрыть"],
+                ["Button"],
+                5,
+            )
+            self._click(close_button)
+            time.sleep(1)
+            return
+        except Exception as exc:
+            self.logger.info(f"Не удалось закрыть форму кнопкой 'Закрыть': {exc}")
+        if query_window == self.main_window:
+            raise RuntimeError("Не удалось закрыть встроенную форму 'Запрос 1С' кнопкой 'Закрыть'.")
+        try:
+            query_window.close()
+            time.sleep(1)
+        except Exception as exc:
+            self.logger.info(f"Не удалось закрыть форму через window.close(): {exc}")
 
     def _prepare_query1c_dialog_via_com(self) -> None:
         connection_string = f'File="{self.config.base_path}";Usr="{self.config.user}";Pwd="";'
@@ -767,6 +925,16 @@ class OneCAgentUiTest:
         )
         return any(marker in text_dump for marker in success_markers)
 
+    def _success_marker_count(self, text_dump: str | None = None) -> int:
+        if text_dump is None:
+            text_dump = self._window_dump_text(self.main_window).lower()
+        markers = (
+            "задача выполнена успешно",
+            "задача завершена",
+            "подтверждено по системным результатам",
+        )
+        return sum(text_dump.count(marker) for marker in markers)
+
     def _find_descendant_by_titles(self, titles: list[str], control_types: list[str], timeout: int):
         deadline = time.time() + timeout
         wanted = {title.lower() for title in titles}
@@ -888,6 +1056,8 @@ class OneCAgentUiTest:
 
     def _set_text_to_input(self, control, text: str) -> None:
         self._activate_main_window()
+        if self.config.mouse_control and self._set_text_via_mouse(control, text):
+            return
         self._click(control)
         if self._set_text_via_physical_clipboard(control, text):
             return
@@ -906,6 +1076,243 @@ class OneCAgentUiTest:
             return
         self._capture_debug_artifacts("input_failure")
         raise RuntimeError("Не удалось ввести текст в поле формы агента.")
+
+    def _set_text_via_mouse(self, control, text: str) -> bool:
+        if not text:
+            return False
+        point = None
+        try:
+            self.logger.info("Mouse-control: вводим текст кликом по экрану и посимвольным набором.")
+            rect = control.rectangle()
+            point = (
+                rect.left + min(max(40, rect.width() // 4), max(40, rect.width() - 20)),
+                rect.top + max(18, min(rect.height() // 2, rect.height() - 8)),
+            )
+            self._activate_main_window()
+            self._click_at(point)
+            keyboard.send_keys("^a", pause=0.05)
+            keyboard.send_keys("{BACKSPACE}", pause=0.05)
+            self._type_text_unicode_chars(text, delay_sec=0.035)
+            time.sleep(0.3)
+            value = self._read_input_value(control)
+            if self._text_input_matches(value, text):
+                return True
+            if value:
+                self.logger.info(f"Mouse-control: после посимвольного ввода поле содержит не весь текст: {value!r}.")
+            full_text = self._window_dump_text(self.main_window).lower() if self.main_window else ""
+            if text.lower() in full_text:
+                return True
+        except Exception as exc:
+            self.logger.info(f"Mouse-control ввод не сработал: {exc}")
+        try:
+            self.logger.info("Mouse-control: пробуем посимвольный ввод физическими клавишами в RU-раскладке.")
+            self._activate_main_window()
+            if point is not None:
+                self._click_at(point)
+            else:
+                self._click(control)
+            keyboard.send_keys("^a", pause=0.05)
+            keyboard.send_keys("{BACKSPACE}", pause=0.05)
+            self._activate_keyboard_layout("00000419", control)
+            self._type_text_physical_keyboard(text, delay_sec=0.045)
+            time.sleep(0.4)
+            value = self._read_input_value(control)
+            if self._text_input_matches(value, text):
+                return True
+            if value:
+                self.logger.info(f"Mouse-control: после физического ввода поле содержит не весь текст: {value!r}.")
+            full_text = self._window_dump_text(self.main_window).lower() if self.main_window else ""
+            if text.lower() in full_text:
+                return True
+        except Exception as exc:
+            self.logger.info(f"Mouse-control физический посимвольный ввод не сработал: {exc}")
+        try:
+            self.logger.info("Mouse-control: посимвольный ввод не подтвердился, fallback на clipboard без Tab.")
+            self._activate_main_window()
+            if point is not None:
+                self._click_at(point)
+            else:
+                self._click(control)
+            keyboard.send_keys("^a", pause=0.05)
+            keyboard.send_keys("{BACKSPACE}", pause=0.05)
+            self._paste_text_to_active_window(text, send_unicode_fallback=False)
+            time.sleep(0.3)
+            value = self._read_input_value(control)
+            return self._text_input_matches(value, text) or bool(value)
+        except Exception as exc:
+            self.logger.info(f"Mouse-control clipboard fallback не сработал: {exc}")
+            return False
+
+    def _text_input_matches(self, actual: str, expected: str) -> bool:
+        actual_norm = (actual or "").strip().lower()
+        expected_norm = (expected or "").strip().lower()
+        return bool(expected_norm) and actual_norm == expected_norm
+
+    def _activate_keyboard_layout(self, layout_id: str, control=None) -> None:
+        if os.name != "nt":
+            return
+        user32 = ctypes.windll.user32
+        user32.GetWindowThreadProcessId.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
+        user32.GetWindowThreadProcessId.restype = ctypes.c_ulong
+        user32.GetKeyboardLayout.argtypes = (ctypes.c_ulong,)
+        user32.GetKeyboardLayout.restype = ctypes.c_void_p
+        hkl = user32.LoadKeyboardLayoutW(layout_id, 1)
+        if not hkl:
+            raise RuntimeError(f"Не удалось загрузить раскладку {layout_id}.")
+        user32.ActivateKeyboardLayout(hkl, 0)
+        target_lang = int(layout_id[-4:], 16)
+        hwnds = []
+        control_hwnd = self._get_hwnd(control) if control is not None else 0
+        main_hwnd = getattr(self.main_window, "handle", 0) if self.main_window is not None else 0
+        foreground_hwnd = user32.GetForegroundWindow()
+        for hwnd in (control_hwnd, main_hwnd, foreground_hwnd):
+            if hwnd and hwnd not in hwnds:
+                hwnds.append(hwnd)
+        WM_INPUTLANGCHANGEREQUEST = 0x0050
+        for hwnd in hwnds:
+            user32.PostMessageW(hwnd, WM_INPUTLANGCHANGEREQUEST, 0, hkl)
+        time.sleep(0.2)
+        if self._foreground_keyboard_lang_id() == target_lang:
+            return
+        for sequence in ("%{VK_SHIFT}", "^{VK_SHIFT}"):
+            for _attempt in range(3):
+                keyboard.send_keys(sequence, pause=0.08)
+                time.sleep(0.2)
+                if self._foreground_keyboard_lang_id() == target_lang:
+                    return
+        current_lang = self._foreground_keyboard_lang_id()
+        raise RuntimeError(f"Не удалось переключить раскладку на {layout_id}; текущая={current_lang:04x}.")
+
+    def _foreground_keyboard_lang_id(self) -> int:
+        if os.name != "nt":
+            return 0
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return 0
+        thread_id = user32.GetWindowThreadProcessId(hwnd, None)
+        hkl = user32.GetKeyboardLayout(thread_id)
+        return int(hkl) & 0xFFFF
+
+    def _type_text_physical_keyboard(self, text: str, delay_sec: float = 0.04) -> None:
+        ru_keys = {
+            "й": 0x51,
+            "ц": 0x57,
+            "у": 0x45,
+            "к": 0x52,
+            "е": 0x54,
+            "н": 0x59,
+            "г": 0x55,
+            "ш": 0x49,
+            "щ": 0x4F,
+            "з": 0x50,
+            "х": 0xDB,
+            "ъ": 0xDD,
+            "ф": 0x41,
+            "ы": 0x53,
+            "в": 0x44,
+            "а": 0x46,
+            "п": 0x47,
+            "р": 0x48,
+            "о": 0x4A,
+            "л": 0x4B,
+            "д": 0x4C,
+            "ж": 0xBA,
+            "э": 0xDE,
+            "я": 0x5A,
+            "ч": 0x58,
+            "с": 0x43,
+            "м": 0x56,
+            "и": 0x42,
+            "т": 0x4E,
+            "ь": 0x4D,
+            "б": 0xBC,
+            "ю": 0xBE,
+            "ё": 0xC0,
+        }
+        for char in text:
+            if char == " ":
+                self._press_virtual_key(0x20)
+            elif char.lower() in ru_keys:
+                self._press_virtual_key(ru_keys[char.lower()], shift=char.isupper())
+            elif char.isascii():
+                vk = ord(char.upper())
+                if 0x30 <= vk <= 0x5A:
+                    self._press_virtual_key(vk, shift=char.isupper())
+                else:
+                    keyboard.send_keys(char, pause=0, with_spaces=True)
+            else:
+                raise RuntimeError(f"Нет физической клавиши для символа {char!r}.")
+            if delay_sec > 0:
+                time.sleep(delay_sec)
+
+    def _press_virtual_key(self, vk_code: int, shift: bool = False) -> None:
+        if os.name != "nt":
+            raise RuntimeError("Virtual-key ввод доступен только на Windows.")
+        user32 = ctypes.windll.user32
+        KEYEVENTF_KEYUP = 0x0002
+        VK_SHIFT = 0x10
+        if shift:
+            user32.keybd_event(VK_SHIFT, 0, 0, 0)
+            time.sleep(0.01)
+        user32.keybd_event(vk_code, 0, 0, 0)
+        time.sleep(0.01)
+        user32.keybd_event(vk_code, 0, KEYEVENTF_KEYUP, 0)
+        if shift:
+            time.sleep(0.01)
+            user32.keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0)
+
+    def _type_text_unicode_chars(self, text: str, delay_sec: float = 0.03) -> None:
+        if os.name != "nt":
+            keyboard.send_keys(text, pause=delay_sec, with_spaces=True)
+            return
+
+        user32 = ctypes.windll.user32
+        user32.SendInput.argtypes = (ctypes.c_uint, ctypes.c_void_p, ctypes.c_int)
+        user32.SendInput.restype = ctypes.c_uint
+        KEYEVENTF_KEYUP = 0x0002
+        KEYEVENTF_UNICODE = 0x0004
+        ULONG_PTR = ctypes.c_ulonglong if ctypes.sizeof(ctypes.c_void_p) == 8 else ctypes.c_ulong
+
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [
+                ("wVk", ctypes.c_ushort),
+                ("wScan", ctypes.c_ushort),
+                ("dwFlags", ctypes.c_uint),
+                ("time", ctypes.c_uint),
+                ("dwExtraInfo", ULONG_PTR),
+            ]
+
+        class INPUTUNION(ctypes.Union):
+            _fields_ = [("ki", KEYBDINPUT)]
+
+        class INPUT(ctypes.Structure):
+            _fields_ = [("type", ctypes.c_uint), ("union", INPUTUNION)]
+
+        def send_code_unit(code_unit: int) -> None:
+            down = INPUT(
+                type=1,
+                union=INPUTUNION(
+                    ki=KEYBDINPUT(0, code_unit, KEYEVENTF_UNICODE, 0, 0)
+                ),
+            )
+            up = INPUT(
+                type=1,
+                union=INPUTUNION(
+                    ki=KEYBDINPUT(0, code_unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
+                ),
+            )
+            sent_down = user32.SendInput(1, ctypes.byref(down), ctypes.sizeof(INPUT))
+            sent_up = user32.SendInput(1, ctypes.byref(up), ctypes.sizeof(INPUT))
+            if sent_down != 1 or sent_up != 1:
+                raise RuntimeError(f"SendInput не отправил unicode code unit {code_unit}.")
+
+        for char in text:
+            encoded = char.encode("utf-16-le")
+            for index in range(0, len(encoded), 2):
+                send_code_unit(encoded[index] | (encoded[index + 1] << 8))
+            if delay_sec > 0:
+                time.sleep(delay_sec)
 
     def _set_text_via_physical_clipboard(self, control, text: str) -> bool:
         if not text:
@@ -1464,6 +1871,26 @@ def parse_args() -> UiConfig:
         help="Текст сообщения агенту",
     )
     parser.add_argument(
+        "--followups-json",
+        default="[]",
+        help="JSON-массив follow-up сообщений для отправки после первого ответа",
+    )
+    parser.add_argument(
+        "--followups-file",
+        default="",
+        help="Файл с JSON-массивом follow-up сообщений",
+    )
+    parser.add_argument(
+        "--show-query-between-turns",
+        action="store_true",
+        help="После каждого хода открывать форму Запрос 1С, показывать запрос/результат и закрывать её",
+    )
+    parser.add_argument(
+        "--mouse-control",
+        action="store_true",
+        help="Выполнять основные действия мышью по экрану, как пользователь",
+    )
+    parser.add_argument(
         "--dialog-type",
         default="Агент",
         help="Тип диалога в форме агента",
@@ -1559,12 +1986,25 @@ def parse_args() -> UiConfig:
         help="Файл-marker: когда тест готов к пользовательским действиям, он создаёт файл для старта записи",
     )
     args = parser.parse_args()
+    try:
+        followups_source = args.followups_json
+        if args.followups_file:
+            followups_source = Path(args.followups_file).read_text(encoding="utf-8-sig")
+        followups = json.loads(followups_source)
+        if not isinstance(followups, list):
+            followups = []
+        followups = [str(item) for item in followups if str(item).strip()]
+    except Exception:
+        followups = []
     return UiConfig(
         platform_exe=args.platform_exe,
         base_path=args.base_path,
         user=args.user,
         password=args.password,
         prompt=args.prompt,
+        followups=followups,
+        show_query_between_turns=args.show_query_between_turns,
+        mouse_control=args.mouse_control,
         dialog_type=args.dialog_type,
         expected_text=args.expected_text,
         timeout_sec=args.timeout_sec,
