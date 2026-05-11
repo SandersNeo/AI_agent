@@ -134,6 +134,7 @@ graph TD
 
 - [**Хабр:** ИИ‑агент внутри 1С](https://habr.com/ru/articles/1006230/)
 - [**Infostart:** 1C AI Agent — продукт, который не «поговорить», а «сделать»](https://infostart.ru/1c/articles/2631305/)
+- [**Infostart:** 1C AI Agent 0.8.5 — графовый агент, файлы и follow-up запросы 1С](https://infostart.ru/1c/articles/2688472/)
 
 ---
 

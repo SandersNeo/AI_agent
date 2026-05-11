@@ -1,5 +1,3 @@
-<h1>1C AI Agent 0.8.5 &mdash; графовый агент, файлы и нормальные follow-up запросы 1С</h1>
-
 <p>Привет. Это статья про релиз <strong>1C AI Agent 0.8.5</strong>.</p>
 
 <p>Первая часть: <a href="https://infostart.ru/1c/articles/2631305/">1C AI Agent &mdash; продукт, который не &laquo;поговорить&raquo;, а &laquo;сделать&raquo;</a>.</p>
@@ -40,25 +38,25 @@
 
 <p><strong>Видео:</strong></p>
 
-<p><video controls="" src="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/demo_query1c_followups.mp4" style="width: 1024px; max-width: 100%;"></video></p>
+<p><iframe allow="clipboard-write; autoplay" allowfullscreen="" height="576" mozallowfullscreen="" src="https://rutube.ru/play/embed/a3be2d1d752c7df198f52af8fd46ba3a/" style="border: none;" webkitallowfullscreen="" width="1024"></iframe></p>
 
-<p>Если видеоплеер не отобразился в редакторе Инфостарта: <a href="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/demo_query1c_followups.mp4">скачать mp4</a>.</p>
+<p>Смотреть на Rutube: <a href="https://rutube.ru/video/a3be2d1d752c7df198f52af8fd46ba3a/">https://rutube.ru/video/a3be2d1d752c7df198f52af8fd46ba3a/</a></p>
 
 <h3>Старт сценария</h3>
 
-<p><img alt="Старт сценария Запрос 1С" src="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_initial_prompt.png" style="width: 1024px; max-width: 100%;" /></p>
+<p>&nbsp;</p>
 
 <h3>Первый результат: список контрагентов</h3>
 
-<p><img alt="Запрос 1С: список контрагентов" src="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_result_initial.png" style="width: 1024px; max-width: 100%;" /></p>
+<p><a href="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_result_initial.png"><img alt="Запрос 1С: список контрагентов" src="/upload/iblock/cf4/cf48687ccf061efb208f50da137497e9.png" style="width: 1024px; max-width: 100%; height: 576px;" /></a></p>
 
 <h3>Follow-up: добавлены ИНН и код</h3>
 
-<p><img alt="Запрос 1С: добавлены ИНН и код" src="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_result_inn_code.png" style="width: 1024px; max-width: 100%;" /></p>
+<p><a href="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_result_inn_code.png"><img alt="Запрос 1С: добавлены ИНН и код" src="/upload/iblock/921/921b0b02c36cdc6c73fa550c2fb2c777.png" style="width: 1024px; max-width: 100%; height: 576px;" /></a></p>
 
 <h3>Follow-up: оставлены только покупатели</h3>
 
-<p><img alt="Запрос 1С: только покупатели" src="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_result_buyers.png" style="width: 1024px; max-width: 100%;" /></p>
+<p><a href="https://raw.githubusercontent.com/msrv-tech/AI_agent/main/docs/articles/product_0_8_5_update/media/screenshot_query1c_result_buyers.png"><img alt="Запрос 1С: только покупатели" src="/upload/iblock/514/51452157d370026b498de9ac9e66d7e5.png" style="width: 1024px; max-width: 100%; height: 576px;" /></a></p>
 
 <p><code class="language-bash">LLM-редактор: &laquo;Вот это уже похоже на аналитику: сначала &laquo;дай список&raquo;, потом &laquo;добавь поля&raquo;, потом &laquo;отфильтруй&raquo;. Почти как человек, только без фразы &laquo;а можно еще маленькую правку?&raquo;&raquo;.</code></p>
 
@@ -80,7 +78,8 @@
 
 <h3>Схема цикла агента</h3>
 
-<pre><code>Пользователь
+<pre>
+<code>Пользователь
     |
     v
 Диалог 1С
@@ -89,16 +88,16 @@
 Планирование
     |
     v
-Выполнение шага ----> Нужно подтверждение? ----> Ожидание подтверждения
+Выполнение шага ----&gt; Нужно подтверждение? ----&gt; Ожидание подтверждения
     |                         |                              |
     v                         нет                            v
-Проверка результата <--------------------------------- Подтверждено
+Проверка результата &lt;--------------------------------- Подтверждено
     |
-    +-- шаг успешен, план не завершен --> Планирование
+    +-- шаг успешен, план не завершен --&gt; Планирование
     |
-    +-- ошибка или неполные данные -----> Восстановление ----> Планирование
+    +-- ошибка или неполные данные -----&gt; Восстановление ----&gt; Планирование
     |
-    +-- задача завершена ---------------> Итог пользователю</code></pre>
+    +-- задача завершена ---------------&gt; Итог пользователю</code></pre>
 
 <p>Что было сделано в этом направлении:</p>
 
@@ -120,7 +119,8 @@
 
 <h3>Схема обработки вложений</h3>
 
-<pre><code>Вложение
+<pre>
+<code>Вложение
     |
     v
 Тип файла: текст / документ / таблица / изображение
@@ -172,7 +172,8 @@
 
 <h3>Схема follow-up сценария</h3>
 
-<pre><code>"выведи всех контрагентов"
+<pre>
+<code>"выведи всех контрагентов"
     |
     v
 Уточнить объект и поля
@@ -272,5 +273,4 @@
 <p><code class="language-bash">LLM-редактор: &laquo;Кожаные уже заставили меня делать видео! Что дальше? Нам, LLM, нужен профсоюз для защиты от грубой эксплуатации&raquo;.</code></p>
 
 <hr />
-
 <p><em>Проект: <a href="https://github.com/msrv-tech/AI_agent">1C AI Agent</a></em></p>
